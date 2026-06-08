@@ -456,36 +456,41 @@ function chainName(id) {
 }
 
 // ====================== 价格 ======================
+function _fetch(url) {
+    return new Promise((resolve, reject) => {
+        const t = setTimeout(() => reject(new Error('timeout')), 6000);
+        fetch(url, { mode: 'cors' }).then(r => { clearTimeout(t); resolve(r); }).catch(e => { clearTimeout(t); reject(e); });
+    });
+}
+
 async function fetchPrice(sym, pair) {
-    // 多个API备选，确保至少一个能用
     const COINCAP_MAP = {
         'BTC': 'bitcoin', 'ETH': 'ethereum', 'BNB': 'binance-coin',
         'CAKE': 'pancakeswap-token', 'DOGE': 'dogecoin', 'SHIB': 'shiba-inu',
-        'PEPE': 'pepe', 'WBNB': 'binance-coin', 'DOT': 'polkadot',
-        'SOL': 'solana', 'XRP': 'ripple', 'FIL': 'filecoin',
-        'LTC': 'litecoin', 'ADA': 'cardano', 'AVAX': 'avalanche-2',
+        'PEPE': 'pepe', 'DOT': 'polkadot', 'SOL': 'solana', 'XRP': 'ripple',
+        'FIL': 'filecoin', 'LTC': 'litecoin', 'ADA': 'cardano', 'AVAX': 'avalanche-2',
         'LINK': 'chainlink', 'MATIC': 'matic-network', 'AAVE': 'aave',
     };
     const id = COINCAP_MAP[sym] || sym.toLowerCase();
-    
-    // 方案1: CryptoCompare (最可靠)
+
+    // 方案1: CryptoCompare
     try {
-        const r = await fetch(`https://min-api.cryptocompare.com/data/price?fsym=${sym}&tsyms=USDT`, { mode: 'cors', signal: AbortSignal.timeout(5000) });
+        const r = await _fetch(`https://min-api.cryptocompare.com/data/price?fsym=${sym}&tsyms=USDT`);
         if (r.ok) {
             const d = await r.json();
             if (d.USDT) return d.USDT;
         }
     } catch {}
-    
+
     // 方案2: CoinCap
     try {
-        const r = await fetch(`https://api.coincap.io/v2/assets/${id}`, { mode: 'cors', signal: AbortSignal.timeout(5000) });
+        const r = await _fetch(`https://api.coincap.io/v2/assets/${id}`);
         if (r.ok) {
             const d = await r.json();
             if (d.data && d.data.priceUsd) return parseFloat(d.data.priceUsd);
         }
     } catch {}
-    
+
     return 0;
 }
 
@@ -884,7 +889,7 @@ async function searchContract() {
     
     // OKX 合约代币信息查询
     try {
-        const r = await fetch(`https://www.okx.com/api/v5/market/ticker?instId=${addr.slice(2,10).toUpperCase()}-USDT`, { mode: 'cors', signal: AbortSignal.timeout(5000) });
+        const r = await fetch(`https://www.okx.com/api/v5/market/ticker?instId=${addr.slice(2,10).toUpperCase()}-USDT`, { mode: 'cors' });
         if (r.ok) {
             const d = await r.json();
             if (d.data && d.data[0]) {
@@ -898,7 +903,7 @@ async function searchContract() {
     
     // CoinGecko 备查
     try {
-        const r = await fetch(`https://api.coingecko.com/api/v3/coins/binancecoin/contract/${addr}`, { mode: 'cors', signal: AbortSignal.timeout(5000) });
+        const r = await fetch(`https://api.coingecko.com/api/v3/coins/binancecoin/contract/${addr}`, { mode: 'cors' });
         if (r.ok) {
             const d = await r.json();
             if (d.id) {
@@ -909,7 +914,7 @@ async function searchContract() {
         }
     } catch {}
     try {
-        const r = await fetch(`https://api.coingecko.com/api/v3/coins/ethereum/contract/${addr}`, { mode: 'cors', signal: AbortSignal.timeout(5000) });
+        const r = await fetch(`https://api.coingecko.com/api/v3/coins/ethereum/contract/${addr}`, { mode: 'cors' });
         if (r.ok) {
             const d = await r.json();
             if (d.id) {
