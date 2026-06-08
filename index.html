@@ -233,9 +233,9 @@
             <div class="form-group">
                 <div class="form-row">
                     <span>初始资金 (USDT)</span>
-                    <span class="param-val" id="lbl-capital">1000</span>
+                    <span class="param-val" id="lbl-capital">10 USDT</span>
                 </div>
-                <input type="range" id="sl-capital" min="100" max="10000" step="100" value="1000">
+                <input type="range" id="sl-capital" min="10" max="10000" step="10" value="10">
             </div>
             <div class="form-group">
                 <div class="form-row">
@@ -408,7 +408,7 @@
 <script>
 // ====================== 核心引擎 ======================
 const cfg = {
-    capital: 1000,
+    capital: 10,
     perTrade: 0.10,
     profitRate: 0.05,
     buyDropRate: 0.03,
@@ -921,7 +921,7 @@ function bindSlider(id, lblId, fmt, setter) {
     });
 }
 
-bindSlider('sl-capital', 'lbl-capital', v => v, v => cfg.capital = v);
+bindSlider('sl-capital', 'lbl-capital', v => v + ' USDT', v => cfg.capital = v);
 bindSlider('sl-per', 'lbl-per', v => v+'%', v => cfg.perTrade = v/100);
 bindSlider('sl-profit', 'lbl-profit', v => v+'%', v => cfg.profitRate = v/100);
 bindSlider('sl-drop', 'lbl-drop', v => v+'%', v => cfg.buyDropRate = v/100);
@@ -1301,7 +1301,7 @@ try {
         Object.assign(state, d.state);
         Object.assign(cfg, d.cfg);
         document.getElementById('sl-capital').value = cfg.capital;
-        document.getElementById('lbl-capital').textContent = cfg.capital;
+        document.getElementById('lbl-capital').textContent = cfg.capital + ' USDT';
         document.getElementById('sl-per').value = cfg.perTrade * 100;
         document.getElementById('lbl-per').textContent = (cfg.perTrade*100)+'%';
         document.getElementById('sl-profit').value = cfg.profitRate * 100;
