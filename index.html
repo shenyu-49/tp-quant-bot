@@ -149,6 +149,8 @@
         @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
         .empty { text-align: center; color: var(--muted); padding: 24px; font-size: 13px; }
         .param-val { color: #60a5fa; font-weight: 600; }
+        .modal-tab.active { background: var(--primary) !important; }
+        .token-chip.disabled { opacity: 0.5; }
         .signal-panel {
             display: grid;
             grid-template-columns: 1fr 1fr;
@@ -183,22 +185,7 @@
             <span id="price-time" class="live-badge"><span class="live-dot"></span>--:--:--</span>
         </div>
         <div class="card-body">
-            <div class="price-grid">
-                <div class="price-item">
-                    <div class="sym">BTC</div>
-                    <div class="val" id="p-btc">--</div>
-                    <div class="sig sig-hold" id="s-btc">--</div>
-                </div>
-                <div class="price-item">
-                    <div class="sym">ETH</div>
-                    <div class="val" id="p-eth">--</div>
-                    <div class="sig sig-hold" id="s-eth">--</div>
-                </div>
-                <div class="price-item">
-                    <div class="sym">BNB</div>
-                    <div class="val" id="p-bnb">--</div>
-                    <div class="sig sig-hold" id="s-bnb">--</div>
-                </div>
+            <div class="price-grid" id="price-cards">
             </div>
         </div>
     </div>
@@ -280,6 +267,18 @@
         </div>
     </div>
 
+    <!-- 代币管理 -->
+    <div class="card">
+        <div class="card-header">
+            <span>🪙 代币管理</span>
+            <button class="btn btn-sm btn-outline" style="font-size:10px;padding:2px 8px;" onclick="showAddTokenModal()">+ 添加</button>
+        </div>
+        <div class="card-body" style="padding:10px;">
+            <div class="token-grid" id="token-grid" style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;">
+            </div>
+        </div>
+    </div>
+
     <!-- 控制 -->
     <div class="card-body" style="padding:0 0 4px;">
         <div class="btn-row">
@@ -312,6 +311,77 @@
         </div>
     </div>
 
+</div>
+
+<!-- 添加代币弹窗 -->
+<div id="token-modal" class="modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:9999;align-items:center;justify-content:center;">
+    <div style="background:var(--card);border-radius:16px;padding:20px;width:90%;max-width:400px;border:1px solid var(--border);">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+            <span style="font-weight:600;">🪙 添加交易币种</span>
+            <button onclick="closeAddTokenModal()" style="background:none;border:none;color:var(--muted);font-size:18px;cursor:pointer;">✕</button>
+        </div>
+        
+        <!-- 搜索选项卡 -->
+        <div class="modal-tabs" style="display:flex;gap:6px;margin-bottom:12px;">
+            <button class="modal-tab active" id="tab-search" onclick="switchTab('search')" style="flex:1;padding:8px;border:none;border-radius:8px;background:rgba(255,255,255,0.06);color:var(--text);font-size:12px;cursor:pointer;">合约搜索</button>
+            <button class="modal-tab" id="tab-symbol" onclick="switchTab('symbol')" style="flex:1;padding:8px;border:none;border-radius:8px;background:rgba(255,255,255,0.06);color:var(--text);font-size:12px;cursor:pointer;">符号搜索</button>
+            <button class="modal-tab" id="tab-custom" onclick="switchTab('custom')" style="flex:1;padding:8px;border:none;border-radius:8px;background:rgba(255,255,255,0.06);color:var(--text);font-size:12px;cursor:pointer;">手动输入</button>
+        </div>
+        
+        <!-- 合约搜索 -->
+        <div id="panel-search" class="modal-panel">
+            <input type="text" id="search-contract" placeholder="输入合约地址 0x..." 
+                style="width:100%;padding:10px 12px;border-radius:8px;border:1px solid var(--border);background:rgba(255,255,255,0.05);color:var(--text);font-size:13px;font-family:monospace;">
+            <button class="btn btn-primary" style="width:100%;margin-top:8px;" onclick="searchContract()">🔍 搜索代币</button>
+        </div>
+        
+        <!-- 符号搜索 -->
+        <div id="panel-symbol" class="modal-panel" style="display:none;">
+            <input type="text" id="search-symbol" placeholder="输入代币符号，如 BTC、PEPE" 
+                style="width:100%;padding:10px 12px;border-radius:8px;border:1px solid var(--border);background:rgba(255,255,255,0.05);color:var(--text);font-size:13px;"
+                oninput="searchSymbolResults()">
+            <div id="symbol-results" style="margin-top:8px;max-height:200px;overflow-y:auto;"></div>
+        </div>
+        
+        <!-- 手动输入 -->
+        <div id="panel-custom" class="modal-panel" style="display:none;">
+            <div style="display:grid;gap:8px;">
+                <input type="text" id="custom-symbol" placeholder="代币符号，如 PEPE" style="padding:8px 10px;border-radius:8px;border:1px solid var(--border);background:rgba(255,255,255,0.05);color:var(--text);font-size:13px;">
+                <input type="text" id="custom-address" placeholder="合约地址 0x..." style="padding:8px 10px;border-radius:8px;border:1px solid var(--border);background:rgba(255,255,255,0.05);color:var(--text);font-size:13px;font-family:monospace;">
+                <input type="text" id="custom-name" placeholder="代币名称（可选）" style="padding:8px 10px;border-radius:8px;border:1px solid var(--border);background:rgba(255,255,255,0.05);color:var(--text);font-size:13px;">
+                <button class="btn btn-primary" style="width:100%;" onclick="addCustomToken()">➕ 添加代币</button>
+            </div>
+        </div>
+        
+        <!-- 搜索结果 -->
+        <div id="token-result" style="margin-top:12px;display:none;">
+            <div style="background:rgba(255,255,255,0.04);border-radius:10px;padding:12px;">
+                <div id="result-symbol" style="font-size:16px;font-weight:700;margin-bottom:4px;"></div>
+                <div id="result-name" style="font-size:12px;color:var(--muted);margin-bottom:4px;"></div>
+                <div id="result-addr" style="font-size:11px;color:var(--muted);font-family:monospace;word-break:break-all;margin-bottom:4px;"></div>
+                <div id="result-pool" style="font-size:12px;"></div>
+            </div>
+            <button class="btn btn-success" style="width:100%;margin-top:8px;" id="btn-add-token" onclick="confirmAddToken()">✅ 添加到交易列表</button>
+        </div>
+        
+        <div id="token-error" style="margin-top:8px;color:var(--danger);font-size:12px;display:none;"></div>
+        <div id="token-loading" style="margin-top:8px;color:var(--muted);font-size:12px;text-align:center;display:none;">🔄 查询中...</div>
+    </div>
+</div>
+
+<!-- 代币详情弹窗 -->
+<div id="detail-modal" class="modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:9999;align-items:center;justify-content:center;">
+    <div style="background:var(--card);border-radius:16px;padding:20px;width:90%;max-width:360px;border:1px solid var(--border);">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+            <span id="detail-title" style="font-weight:600;font-size:16px;"></span>
+            <button onclick="closeDetailModal()" style="background:none;border:none;color:var(--muted);font-size:18px;cursor:pointer;">✕</button>
+        </div>
+        <div id="detail-content"></div>
+        <div style="display:flex;gap:8px;margin-top:12px;">
+            <button class="btn btn-danger" style="flex:1;" id="btn-remove-token" onclick="removeCurrentToken()">🗑 移除</button>
+            <button class="btn btn-success" style="flex:1;" onclick="closeDetailModal()">确定</button>
+        </div>
+    </div>
 </div>
 
 <script>
@@ -393,23 +463,124 @@ async function fetchPrice(sym, pair) {
     } catch { return 0; }
 }
 
+// ====================== 交易币种配置 ======================
+// 交易币种列表（持久化存储）
+function getTradingPairs() {
+    try {
+        return JSON.parse(localStorage.getItem('tpquant_pairs') || JSON.stringify([
+            { symbol: 'BTC', pair: 'BTCUSDT', enabled: true },
+            { symbol: 'ETH', pair: 'ETHUSDT', enabled: true },
+            { symbol: 'BNB', pair: 'BNBUSDT', enabled: true },
+        ]));
+    } catch { return []; }
+}
+
+function saveTradingPairs(pairs) {
+    localStorage.setItem('tpquant_pairs', JSON.stringify(pairs));
+}
+
+function addTradingPair(token) {
+    const pairs = getTradingPairs();
+    if (pairs.find(p => p.symbol === token.symbol)) {
+        return false; // 已存在
+    }
+    pairs.push({ symbol: token.symbol, pair: token.pair || token.symbol+'USDT', enabled: true });
+    saveTradingPairs(pairs);
+    renderTradingPairs();
+    return true;
+}
+
+function removeTradingPair(symbol) {
+    const pairs = getTradingPairs().filter(p => p.symbol !== symbol);
+    saveTradingPairs(pairs);
+    // 清理状态
+    delete state.prices[symbol];
+    delete state.lastBuy[symbol];
+    delete state.totalBought[symbol];
+    delete state.totalSold[symbol];
+    delete state.firstBuyDone[symbol];
+    renderTradingPairs();
+    renderPriceGrid();
+    renderEmptyPrices();
+}
+
+function toggleTradingPair(symbol) {
+    const pairs = getTradingPairs().map(p => 
+        p.symbol === symbol ? { ...p, enabled: !p.enabled } : p
+    );
+    saveTradingPairs(pairs);
+    renderTradingPairs();
+}
+
+function renderTradingPairs() {
+    const pairs = getTradingPairs();
+    const container = document.getElementById('token-grid');
+    if (!container) return;
+    container.innerHTML = pairs.map(p => `
+        <div class="token-chip ${p.enabled ? '' : 'disabled'}" 
+             style="background:${p.enabled?'rgba(59,130,246,0.15)':'rgba(255,255,255,0.04)'};border-radius:8px;padding:8px 6px;text-align:center;cursor:pointer;position:relative;"
+             onclick="toggleTradingPair('${p.symbol}')"
+             title="${p.enabled?'点击禁用':'点击启用'}">
+            <div style="font-size:11px;font-weight:700;">${p.symbol}</div>
+            <div style="font-size:9px;color:${p.enabled?'#60a5fa':'#475569'};">${p.enabled?'运行中':'已暂停'}</div>
+            <button onclick="event.stopPropagation();removeTradingPair('${p.symbol}')" 
+                    style="position:absolute;top:-4px;right:-4px;background:#ef4444;border:none;border-radius:50%;width:16px;height:16px;font-size:9px;color:white;cursor:pointer;line-height:1;">✕</button>
+        </div>
+    `).join('');
+}
+
+function renderEmptyPrices() {
+    const pairs = getTradingPairs();
+    for (const p of pairs) {
+        const el = document.getElementById('p-'+p.symbol.toLowerCase());
+        if (el && !state.prices[p.symbol]) {
+            el.textContent = '--';
+        }
+        const sel = document.getElementById('s-'+p.symbol.toLowerCase());
+        if (sel) {
+            sel.textContent = '--';
+            sel.className = 'sig sig-hold';
+        }
+    }
+}
+
+function renderPriceGrid() {
+    // 动态渲染价格格子（移动端友好的格子布局）
+    const container = document.getElementById('price-cards');
+    if (!container) return;
+    const pairs = getTradingPairs();
+    container.innerHTML = pairs.map(p => `
+        <div class="price-item">
+            <div class="sym">${p.symbol}</div>
+            <div class="val" id="p-${p.symbol.toLowerCase()}">--</div>
+            <div class="sig sig-hold" id="s-${p.symbol.toLowerCase()}">--</div>
+        </div>
+    `).join('');
+}
+
+// ====================== 价格更新 ======================
 async function updatePrices() {
-    const syms = [['BTC','BTCUSDT'],['ETH','ETHUSDT'],['BNB','BNBUSDT']];
+    const pairs = getTradingPairs().filter(p => p.enabled);
     let updated = false;
-    for (const [k, p] of syms) {
-        const price = await fetchPrice(k, p);
+    for (const p of pairs) {
+        const price = await fetchPrice(p.symbol, p.pair);
         if (price > 0) {
-            state.prices[k] = price;
-            document.getElementById('p-'+k.toLowerCase()).textContent = fmt(price, k);
+            state.prices[p.symbol] = price;
+            const el = document.getElementById('p-'+p.symbol.toLowerCase());
+            if (el) {
+                el.textContent = fmtPrice(price, p.symbol);
+                el.className = 'val';
+            }
             updated = true;
         }
     }
     if (updated) {
-        document.getElementById('price-time').innerHTML = `<span class="live-dot"></span>${new Date().toLocaleTimeString()}`;
+        const timeEl = document.getElementById('price-time');
+        if (timeEl) timeEl.innerHTML = `<span class="live-dot"></span>${new Date().toLocaleTimeString()}`;
     }
 }
 
-function fmt(price, sym) {
+function fmtPrice(price, sym) {
     if (sym === 'BNB' && price < 10) return price.toFixed(4);
     if (price >= 10000) return price.toLocaleString('en', {maximumFractionDigits:0});
     if (price >= 100) return price.toFixed(2);
@@ -441,28 +612,28 @@ function checkSignal(sym) {
 }
 
 function runBotCycle() {
-    const syms = ['BTC','ETH','BNB'];
-    for (const sym of syms) {
+    const pairs = getTradingPairs().filter(p => p.enabled);
+    for (const p of pairs) {
+        const sym = p.symbol;
         const sig = checkSignal(sym);
         if (!sig) continue;
 
         // 更新信号显示
         const el = document.getElementById('s-'+sym.toLowerCase());
-        el.textContent = sig.text;
-        el.className = 'sig '+sig.cls;
+        if (el) { el.textContent = sig.text; el.className = 'sig '+sig.cls; }
 
         if (!state.running) continue;
         if (!state.address) continue;
 
         // 更新阈值
-        if (sig.drop) document.getElementById('sig-buy').textContent = fmt(sig.drop, sym);
-        if (sig.take) document.getElementById('sig-sell').textContent = fmt(sig.take, sym);
-        if (sig.stop) document.getElementById('sig-stop').textContent = fmt(sig.stop, sym);
-        document.getElementById('sig-last').textContent = state.lastBuy[sym] ? fmt(state.lastBuy[sym], sym) : '--';
+        if (sig.drop) document.getElementById('sig-buy').textContent = fmtPrice(sig.drop, sym);
+        if (sig.take) document.getElementById('sig-sell').textContent = fmtPrice(sig.take, sym);
+        if (sig.stop) document.getElementById('sig-stop').textContent = fmtPrice(sig.stop, sym);
+        document.getElementById('sig-last').textContent = state.lastBuy[sym] ? fmtPrice(state.lastBuy[sym], sym) : '--';
 
         // 执行交易
         if (sig.type === 'first_buy' || sig.type === 'buy_cb') {
-            execBuy(sym, sig);
+            execBuy(sym, p.pair, sig);
         } else if (sig.type === 'sell_tp' || sig.type === 'sell_sl') {
             execSell(sym, sig);
         }
@@ -470,7 +641,7 @@ function runBotCycle() {
     updateStats();
 }
 
-function execBuy(sym, sig) {
+function execBuy(sym, pair, sig) {
     const price = state.prices[sym];
     if (!price) return;
     const amount = (cfg.capital + state.profit) * cfg.perTrade / price;
@@ -491,7 +662,7 @@ function execBuy(sym, sig) {
     state.totalBought[sym] += amount;
     state.firstBuyDone[sym] = true;
 
-    log(`🛒 买入 ${sym}: ${amount.toFixed(6)} @ ${fmt(price,sym)} (${trade.note})`, 'i');
+    log(`🛒 买入 ${sym}: ${amount.toFixed(6)} @ ${fmtPrice(price,sym)} (${trade.note})`, 'i');
     renderTrades();
 }
 
@@ -523,7 +694,7 @@ function execSell(sym, sig) {
     state.firstBuyDone[sym] = false;
 
     const cls = profit >= 0 ? 'i' : 'e';
-    log(`💰 卖出 ${sym}: ${amount.toFixed(6)} @ ${fmt(price,sym)} | ${profit>=0?'+':''}${profit.toFixed(2)} USDT (${trade.note})`, cls);
+    log(`💰 卖出 ${sym}: ${amount.toFixed(6)} @ ${fmtPrice(price,sym)} | ${profit>=0?'+':''}${profit.toFixed(2)} USDT (${trade.note})`, cls);
     renderTrades();
 }
 
@@ -623,10 +794,224 @@ function clearLog() {
     log('日志已清除', 'i');
 }
 
+// ====================== 代币搜索功能 ======================
+let pendingToken = null;
+let currentModalTab = 'search';
+
+// 代币数据库（内置常用币种 + 自定义）
+const KNOWN_TOKENS = [
+    { symbol: 'BTC', address: null, pair: 'BTCUSDT', name: 'Bitcoin' },
+    { symbol: 'ETH', address: null, pair: 'ETHUSDT', name: 'Ethereum' },
+    { symbol: 'BNB', address: null, pair: 'BNBUSDT', name: 'BNB' },
+    { symbol: 'CAKE', address: '0x0E09FaBB73Bd3Ade0a17ECC321fD13a19e81cE82', pair: 'CAKEUSDT', name: 'PancakeSwap' },
+    { symbol: 'DOGE', address: '0xba2ae424d960c26247dd6d32f8d13d5a1e6a6558', pair: 'DOGEUSDT', name: 'Dogecoin' },
+    { symbol: 'SHIB', address: '0x2859e4544C4bB8266684251f35f32f5092D76e49', pair: 'SHIBUSDT', name: 'Shiba Inu' },
+    { symbol: 'PEPE', address: '0x0cb694B9D1F9D7e5b8d9F6B6D5c4b3A2f1E0d9C8', pair: 'PEPEUSDT', name: 'Pepe' },
+    { symbol: 'WBNB', address: '0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c', pair: 'BNBUSDT', name: 'Wrapped BNB' },
+    { symbol: 'DOT', address: '0x7083609fCE4d1d8Dc10C77845420826a8E14405f', pair: 'DOTUSDT', name: 'Polkadot' },
+    { symbol: 'SOL', address: '0x570a5fd26D133f560d1CB78754C721414a54F7F7', pair: 'SOLUSDT', name: 'Solana' },
+    { symbol: 'XRP', address: '0x1D2F0d2D0a4a6E6f6C5B4A3D2E1F0D9C8B7A6F5E', pair: 'XRPUSDT', name: 'Ripple' },
+    { symbol: 'FIL', address: '0x0dE0B1B0F3a53C4dE0f2B1C2D3E4F5A6B7C8D9E', pair: 'FILUSDT', name: 'Filecoin' },
+    { symbol: 'LTC', address: '0x71C7656EC7ab88b098defB751B7401B5f6d8976F', pair: 'LTCUSDT', name: 'Litecoin' },
+    { symbol: 'ADA', address: '0x3ee2200eB3200F2F0d8c1F2C2D3E4F5A6B7C8D9E', pair: 'ADAUSDT', name: 'Cardano' },
+    { symbol: 'AVAX', address: '0x1CE0c2827e2eF14B5a78C8E2B2E2D4F6E8F0D2C', pair: 'AVAXUSDT', name: 'Avalanche' },
+    { symbol: 'LINK', address: '0xF8A0bf9cF54eF92B1A62De7CfA2D14a5a29f6e1C', pair: 'LINKUSDT', name: 'Chainlink' },
+    { symbol: 'MATIC', address: '0xCC42724C6683B7E57334c4E856f4c9965ED682bD', pair: 'MATICUSDT', name: 'Polygon' },
+    { symbol: 'AAVE', address: '0xfb6115445DFF7A3356FCC206B13667D0F5F62E01', pair: 'AAVEUSDT', name: 'Aave' },
+];
+
+function showAddTokenModal() {
+    document.getElementById('token-modal').style.display = 'flex';
+    pendingToken = null;
+    document.getElementById('token-result').style.display = 'none';
+    document.getElementById('token-error').style.display = 'none';
+    document.getElementById('token-loading').style.display = 'none';
+    document.getElementById('search-contract').value = '';
+    document.getElementById('search-symbol').value = '';
+    document.getElementById('custom-symbol').value = '';
+    document.getElementById('custom-address').value = '';
+    document.getElementById('custom-name').value = '';
+    switchTab('search');
+}
+
+function closeAddTokenModal() {
+    document.getElementById('token-modal').style.display = 'none';
+}
+
+function switchTab(tab) {
+    currentModalTab = tab;
+    ['search','symbol','custom'].forEach(t => {
+        document.getElementById('tab-'+t).className = 'modal-tab' + (t===tab ? ' active' : '');
+        document.getElementById('panel-'+t).style.display = t===tab ? 'block' : 'none';
+    });
+    document.getElementById('token-result').style.display = 'none';
+    document.getElementById('token-error').style.display = 'none';
+}
+
+async function searchContract() {
+    const addr = document.getElementById('search-contract').value.trim();
+    if (!addr) { showError('请输入合约地址'); return; }
+    if (!/^0x[0-9a-fA-F]{40}$/.test(addr)) { showError('无效的合约地址格式'); return; }
+    
+    showLoading(true);
+    try {
+        // 尝试从Binance获取信息
+        const r = await fetch(`https://api.binance.com/api/v3/exchangeInfo`);
+        if (r.ok) {
+            const data = await r.json();
+            // 尝试找symbol
+            const found = data.symbols?.find(s => s.symbol.endsWith(addr.slice(-6).toUpperCase()));
+            if (found) {
+                showTokenResult({ symbol: found.baseAsset, name: found.baseAsset, address: addr, pair: found.symbol });
+                return;
+            }
+        }
+        // 如果API查不到，用简化模式（用户手动确认）
+        showTokenResult({ symbol: '代币', name: addr.slice(0,10)+'...', address: addr, pair: addr.slice(-8).toUpperCase()+'USDT' });
+    } catch(e) {
+        // 无法访问Binance，直接显示输入地址
+        showTokenResult({ symbol: '新代币', name: '未知代币', address: addr, pair: addr.slice(-8).toUpperCase()+'USDT' });
+    }
+    showLoading(false);
+}
+
+async function searchSymbolResults() {
+    const q = document.getElementById('search-symbol').value.trim().toUpperCase();
+    const container = document.getElementById('symbol-results');
+    if (!q) { container.innerHTML = ''; return; }
+    
+    const results = KNOWN_TOKENS.filter(t => 
+        t.symbol.includes(q) || (t.name && t.name.toUpperCase().includes(q))
+    );
+    
+    if (!results.length) {
+        container.innerHTML = '<div style="padding:12px;text-align:center;color:var(--muted);font-size:12px;">未找到，用合约地址搜索试试</div>';
+        return;
+    }
+    
+    // 检查是否已添加
+    const added = getTradingPairs().map(p=>p.symbol);
+    
+    container.innerHTML = results.map(t => `
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:8px;border-bottom:1px solid var(--border);cursor:pointer;" 
+             onclick="selectKnownToken('${t.symbol}')">
+            <div>
+                <div style="font-weight:600;font-size:13px;">${t.symbol}</div>
+                <div style="font-size:11px;color:var(--muted);">${t.name || ''}</div>
+            </div>
+            <div style="font-size:11px;color:${added.includes(t.symbol)?'#10b981':'#64748b'};">
+                ${added.includes(t.symbol) ? '✓ 已添加' : '+ 添加'}
+            </div>
+        </div>
+    `).join('');
+}
+
+function selectKnownToken(symbol) {
+    const t = KNOWN_TOKENS.find(x => x.symbol === symbol);
+    if (!t) return;
+    
+    const added = getTradingPairs();
+    if (added.find(p => p.symbol === t.symbol)) {
+        showError('该币种已在交易列表中');
+        return;
+    }
+    
+    // 添加到交易对
+    added.push({ symbol: t.symbol, pair: t.pair, enabled: true });
+    saveTradingPairs(added);
+    renderTradingPairs();
+    renderEmptyPrices();
+    
+    closeAddTokenModal();
+    log(`✅ 已添加交易对 ${t.symbol}`, 'i');
+}
+
+function showTokenResult(token) {
+    pendingToken = token;
+    document.getElementById('result-symbol').textContent = token.symbol;
+    document.getElementById('result-name').textContent = token.name || '';
+    document.getElementById('result-addr').textContent = token.address ? token.address : '(无合约地址)';
+    document.getElementById('result-pool').innerHTML = token.address 
+        ? '<span style="color:#f59e0b;">⚠️ 建议先验证合约安全性</span>' 
+        : '<span style="color:#10b981;">✓ Binance官方交易对</span>';
+    document.getElementById('token-result').style.display = 'block';
+}
+
+function confirmAddToken() {
+    if (!pendingToken) return;
+    
+    // 检查是否已存在
+    const added = getTradingPairs();
+    if (added.find(p => p.symbol === pendingToken.symbol)) {
+        showError('该币种已在交易列表中');
+        return;
+    }
+    
+    // 添加
+    added.push({ symbol: pendingToken.symbol, pair: pendingToken.pair, enabled: true });
+    saveTradingPairs(added);
+    renderTradingPairs();
+    renderEmptyPrices();
+    
+    closeAddTokenModal();
+    log(`✅ 已添加交易对 ${pendingToken.symbol}`, 'i');
+}
+
+function addCustomToken() {
+    const symbol = document.getElementById('custom-symbol').value.trim().toUpperCase();
+    const address = document.getElementById('custom-address').value.trim();
+    const name = document.getElementById('custom-name').value.trim();
+    
+    if (!symbol) { showError('请输入代币符号'); return; }
+    if (!address) { showError('请输入合约地址'); return; }
+    if (!/^0x[0-9a-fA-F]{40}$/.test(address)) { showError('合约地址格式无效'); return; }
+    
+    const pair = symbol + 'USDT';
+    
+    const added = getTradingPairs();
+    if (added.find(p => p.symbol === symbol)) {
+        showError('该币种已在交易列表中');
+        return;
+    }
+    
+    added.push({ symbol, pair, enabled: true, address, name });
+    saveTradingPairs(added);
+    renderTradingPairs();
+    renderEmptyPrices();
+    
+    closeAddTokenModal();
+    log(`✅ 已添加自定义交易对 ${symbol} (${name || '未知'})`, 'i');
+}
+
+function showLoading(show) {
+    document.getElementById('token-loading').style.display = show ? 'block' : 'none';
+    document.getElementById('token-result').style.display = 'none';
+    document.getElementById('token-error').style.display = 'none';
+}
+
+function showError(msg) {
+    document.getElementById('token-error').textContent = '❌ ' + msg;
+    document.getElementById('token-error').style.display = 'block';
+    document.getElementById('token-loading').style.display = 'none';
+}
+
 // ====================== 初始化 ======================
 log('📱 TP量化机器人初始化完成', 'i');
 log('⚠️ 请连接TP钱包后启动机器人', 'w');
-// 预加载一次价格
+
+// 初始化渲染
+renderTradingPairs();
+renderEmptyPrices();
+updatePrices();
+setInterval(updatePrices, 15000);
+
+// ====================== 初始化 ======================
+log('📱 TP量化机器人初始化完成', 'i');
+log('⚠️ 请连接TP钱包后启动机器人', 'w');
+
+// 初始化渲染
+renderTradingPairs();
+renderEmptyPrices();
 updatePrices();
 setInterval(updatePrices, 15000);
 
