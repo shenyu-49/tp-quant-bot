@@ -1,9 +1,0 @@
-{
-  "initial_capital": 1000,
-  "per_trade_ratio": 0.1,
-  "profit_rate": 0.02,
-  "buy_drop_rate": 0.015,
-  "stop_loss_rate": 0.05,
-  "check_interval": 10,
-  "symbols": ["BTC/USDT", "ETH/USDT", "BNB/USDT"]
-}
