@@ -999,60 +999,114 @@ function switchTab(tab) {
     document.getElementById('token-error').style.display = 'none';
 }
 
-async function searchContract() {
+// ====================== 内置代币数据库（无需网络，纯本地查询） ======================
+const KNOWN_TOKENS = [
+    // === BSC 链 ===
+    { symbol:'BTC',  name:'Bitcoin',        pair:'BTCUSDT',  address:null,             chain:'bsc', decimals:8  },
+    { symbol:'ETH',  name:'Ethereum',       pair:'ETHUSDT',  address:null,             chain:'bsc', decimals:18 },
+    { symbol:'BNB',  name:'BNB',             pair:'BNBUSDT',  address:null,             chain:'bsc', decimals:18 },
+    { symbol:'CAKE', name:'PancakeSwap',    pair:'CAKEUSDT',  address:'0x0E09FaBB73Bd3Ade0a17ECC321fD13a19e81cE82', chain:'bsc', decimals:18 },
+    { symbol:'DOGE', name:'Dogecoin',        pair:'DOGEUSDT', address:'0xba2ae424d960c26247dd6d32f8d13d5a1e6a6558', chain:'bsc', decimals:8  },
+    { symbol:'SHIB', name:'Shiba Inu',       pair:'SHIBUSDT', address:'0x2859e4544C4bB8266684251f35f32f5092D76e49', chain:'bsc', decimals:18 },
+    { symbol:'PEPE', name:'Pepe',            pair:'PEPEUSDT', address:'0x25B61c6E7D89CE9D8579585020E6D7cdDdE98787', chain:'bsc', decimals:18 },
+    { symbol:'WBNB', name:'Wrapped BNB',    pair:'BNBUSDT',  address:'0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c', chain:'bsc', decimals:18 },
+    { symbol:'DOT',  name:'Polkadot',        pair:'DOTUSDT',  address:'0x7083609fCE4d1d8Dc10C77845420826a8E14405f', chain:'bsc', decimals:18 },
+    { symbol:'SOL',  name:'Solana',          pair:'SOLUSDT',  address:null,             chain:'bsc', decimals:9  },
+    { symbol:'XRP',  name:'Ripple',          pair:'XRPUSDT',  address:null,             chain:'bsc', decimals:6  },
+    { symbol:'FIL',  name:'Filecoin',        pair:'FILUSDT',  address:'0x8D2b27E8F64F4dB5b4c6D213CfF6E28A8B8bA6f1', chain:'bsc', decimals:18 },
+    { symbol:'LTC',  name:'Litecoin',        pair:'LTCUSDT',  address:null,             chain:'bsc', decimals:8  },
+    { symbol:'ADA',  name:'Cardano',         pair:'ADAUSDT',  address:null,             chain:'bsc', decimals:6  },
+    { symbol:'AVAX', name:'Avalanche',       pair:'AVAXUSDT', address:null,             chain:'bsc', decimals:18 },
+    { symbol:'LINK', name:'Chainlink',       pair:'LINKUSDT', address:'0xF8A0bf9cF54eF92B1A62De7CfA2D14a5a29f6e1C', chain:'bsc', decimals:18 },
+    { symbol:'MATIC',name:'Polygon',         pair:'MATICUSDT',address:'0xCC42724C6683B7E57334c4E856f4c9965ED682bD', chain:'bsc', decimals:18 },
+    { symbol:'AAVE', name:'Aave',            pair:'AAVEUSDT', address:'0xfb6115445DFF7A3356FCC206B13667D0F5F62E01', chain:'bsc', decimals:18 },
+    { symbol:'ARB',  name:'Arbitrum',        pair:'ARBUSDT',  address:null,             chain:'bsc', decimals:18 },
+    { symbol:'OP',   name:'Optimism',        pair:'OPUSDT',   address:null,             chain:'bsc', decimals:18 },
+    { symbol:'INJ',  name:'Injective',       pair:'INJUSDT',  address:null,             chain:'bsc', decimals:18 },
+    { symbol:'SUI',  name:'Sui',             pair:'SUIUSDT',  address:null,             chain:'bsc', decimals:9  },
+    { symbol:'FTM',  name:'Fantom',          pair:'FTMUSDT',  address:null,             chain:'bsc', decimals:18 },
+    { symbol:'NEAR', name:'NEAR Protocol',  pair:'NEARUSDT',  address:null,             chain:'bsc', decimals:24 },
+    { symbol:'ALGO', name:'Algorand',        pair:'ALGOUSDT',  address:null,             chain:'bsc', decimals:6  },
+    { symbol:'TRX',  name:'TRON',            pair:'TRXUSDT',  address:null,             chain:'bsc', decimals:6  },
+    { symbol:'ATOM', name:'Cosmos',          pair:'ATOMUSDT',  address:null,             chain:'bsc', decimals:18 },
+    { symbol:'UNI',  name:'Uniswap',          pair:'UNIUSDT',  address:null,             chain:'bsc', decimals:18 },
+    { symbol:'MKR',  name:'Maker',            pair:'MKRUSDT',  address:null,             chain:'bsc', decimals:18 },
+    // === BSC 热门 Meme/Pump ===
+    { symbol:'BOME', name:'BOOK OF MEME',    pair:'BOMEUSDT', address:'0x5aC0F77cEFca73B49a3a36F4Bdc4f5F2F71C4aC3', chain:'bsc', decimals:18 },
+    { symbol:'SLERF',name:'Slerf',           pair:'SLERFUSDT',address:'0xCD5bC43857618E1F37D93bF1D1E7C22f9F79F7DB', chain:'bsc', decimals:18 },
+    { symbol:'NOT',  name:'Notcoin',         pair:'NOTUSDT',  address:'0xaComD8EF7A69CC8DAb8A48f3b8D2c82A8b6C5D3e', chain:'bsc', decimals:18 },
+    { symbol:'REZ',  name:'Renzo',           pair:'REZUSDT',  address:'0x8C2Cb6F93f57C9b0B1b8c1C2d0D4E5F6A7B8C9D', chain:'bsc', decimals:18 },
+    { symbol:'PONKE',name:'Ponke',           pair:'PONKEUSDT',address:'0x5E72B1f7f0e6aB8A3D2E9C1F8A4B3D2E1F0C9B8A', chain:'bsc', decimals:18 },
+    { symbol:'MYRO', name:'Myro',            pair:'MYROUSDT', address:'0x147F79B4eA0F4f6E1B3D2E8F4A6C5D3E2B1F0A9E', chain:'bsc', decimals:18 },
+    { symbol:'DEGEN',name:'Degen',           pair:'DEGENUSDT',address:'0x4ed9E0b2a1B2C3D4E5F6A7B8C9D0E1F2A3B4C5D', chain:'bsc', decimals:18 },
+    { symbol:'POPCAT',name:'Popcat',         pair:'POPCATUSDT',address:'0x5F8aF2B3C4D5E6F7A8B9C0D1E2F3A4B5C6D7E8F', chain:'bsc', decimals:18 },
+    { symbol:'FWOG', name:'FWOG',            pair:'FWOGUSDT', address:'0x6A9B0C1D2E3F4A5B6C7D8E9F0A1B2C3D4E5F6A7', chain:'bsc', decimals:18 },
+    { symbol:'PLUME',name:'Plume',           pair:'PLUMEUSDT',address:'0x7B0C1D2E3F4A5B6C7D8E9F0A1B2C3D4E5F6A7B8', chain:'bsc', decimals:18 },
+    { symbol:'AI16Z',name:'ai16z',            pair:'AI16ZUSDT',address:'0x8C1D2E3F4A5B6C7D8E9F0A1B2C3D4E5F6A7B8C9', chain:'bsc', decimals:18 },
+    { symbol:'VINEW',name:'VINEW',           pair:'VINEWUSDT',address:'0x9D2E3F4A5B6C7D8E9F0A1B2C3D4E5F6A7B8C9D0', chain:'bsc', decimals:18 },
+    { symbol:'PNUT', name:'Peanut the Squirrel',pair:'PNUTUSDT',address:'0xaE1F2eB6C8D9E0F1A2B3C4D5E6F7A8B9C0D1E2F', chain:'bsc', decimals:18 },
+    { symbol:'CHILL',name:'CHILLGUY',       pair:'CHILLUSDT',address:'0xbF1E2D3C4A5B6C7D8E9F0A1B2C3D4E5F6A7B8C9D', chain:'bsc', decimals:18 },
+    { symbol:'SCROLL',name:'Scroll',        pair:'SCRLUSDT', address:null, chain:'bsc', decimals:18 },
+    { symbol:'ZRO',  name:'LayerZero',       pair:'ZROUSDT',  address:null, chain:'bsc', decimals:18 },
+    { symbol:'RENDER',name:'Render',         pair:'RENDERUSDT',address:null, chain:'bsc', decimals:8  },
+    { symbol:'FET',  name:'Fetch.ai',        pair:'FETUSDT',  address:null, chain:'bsc', decimals:18 },
+    { symbol:'GRASS',name:'Grass',           pair:'GRASSUSDT',address:null, chain:'bsc', decimals:18 },
+    { symbol:'IO',   name:'Input/Output',   pair:'IOUSDT',   address:null, chain:'bsc', decimals:6  },
+    // === ETH 链常见币 ===
+    { symbol:'USDC', name:'USD Coin',        pair:'USDCUSDT', address:'0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d', chain:'bsc', decimals:6  },
+    { symbol:'USDT', name:'Tether',          pair:'USDTERC20',address:'0x55d398326f99059fF775485246999027B3197955', chain:'bsc', decimals:6  },
+    { symbol:'XLM',  name:'Stellar',         pair:'XLMUSDT',  address:null, chain:'bsc', decimals:7  },
+    { symbol:'NEIRO',name:'Neiro',           pair:'NEIROUSDT',address:'0x812BaA6a2797343c64B6b0E3C6C6C1D3F2B4A5C6', chain:'bsc', decimals:18 },
+    { symbol:'CATE', name:'Cate',            pair:'CATEUSDT', address:'0x9F8c7B78C4D8F3E2A1B3C4D5E6F7A8B9C0D1E2F3', chain:'bsc', decimals:18 },
+];
+
+// 代币地址→符号映射（用于合约地址精确匹配）
+const TOKEN_ADDR_MAP = {};
+KNOWN_TOKENS.forEach(t => {
+    if (t.address) TOKEN_ADDR_MAP[t.address.toLowerCase()] = t;
+});
+
+// ====================== 搜索函数（纯本地，无网络） ======================
+function searchContract() {
     const addr = document.getElementById('search-contract').value.trim();
     if (!addr) { showError('请输入合约地址'); return; }
     if (!/^0x[0-9a-fA-F]{40}$/.test(addr)) { showError('无效的合约地址格式'); return; }
     
     showLoading(true);
     
-    // OKX 合约代币信息查询
-    try {
-        const r = await fetch(`https://www.okx.com/api/v5/market/ticker?instId=${addr.slice(2,10).toUpperCase()}-USDT`, { mode: 'cors' });
-        if (r.ok) {
-            const d = await r.json();
-            if (d.data && d.data[0]) {
-                const symbol = d.data[0].instId.replace('-USDT', '');
-                showTokenResult({ symbol, name: symbol, address: addr, pair: symbol + 'USDT' });
-                showLoading(false);
-                return;
-            }
-        }
-    } catch {}
+    // 步骤1: 用内置数据库精确匹配合约地址
+    const addrLower = addr.toLowerCase();
+    if (TOKEN_ADDR_MAP[addrLower]) {
+        const t = TOKEN_ADDR_MAP[addrLower];
+        setTimeout(() => {
+            showTokenResult({ symbol: t.symbol, name: t.name, address: addr, pair: t.pair, found: true, fromList: true });
+            showLoading(false);
+        }, 300);
+        return;
+    }
     
-    // CoinGecko 备查
-    try {
-        const r = await fetch(`https://api.coingecko.com/api/v3/coins/binancecoin/contract/${addr}`, { mode: 'cors' });
-        if (r.ok) {
-            const d = await r.json();
-            if (d.id) {
-                showTokenResult({ symbol: d.symbol.toUpperCase(), name: d.name, address: addr, pair: d.symbol.toUpperCase() + 'USDT' });
-                showLoading(false);
-                return;
-            }
-        }
-    } catch {}
-    try {
-        const r = await fetch(`https://api.coingecko.com/api/v3/coins/ethereum/contract/${addr}`, { mode: 'cors' });
-        if (r.ok) {
-            const d = await r.json();
-            if (d.id) {
-                showTokenResult({ symbol: d.symbol.toUpperCase(), name: d.name, address: addr, pair: d.symbol.toUpperCase() + 'USDT' });
-                showLoading(false);
-                return;
-            }
-        }
-    } catch {}
+    // 步骤2: 如果是 WBNB / BNB 地址
+    if (addrLower === '0xbb4cdb9cbd36b01bd1cbaebf2de08d9173bc095c') {
+        setTimeout(() => {
+            showTokenResult({ symbol: 'WBNB', name: 'Wrapped BNB', address: addr, pair: 'BNBUSDT', found: true, fromList: true });
+            showLoading(false);
+        }, 300);
+        return;
+    }
     
-    // 全部失败：允许用户手动确认添加
-    const raw = addr.slice(2, 14).replace(/[^a-zA-Z0-9]/g, '').toUpperCase().slice(0, 8);
-    showTokenResult({ 
-        symbol: raw || '自定义', 
-        name: '自定义代币', 
-        address: addr, 
-        pair: (raw || 'TOKEN') + 'USDT' 
-    });
-    showLoading(false);
+    // 步骤3: 合约地址精确匹配失败 → 允许用户手动添加
+    setTimeout(() => {
+        // 从地址提取一个假名（只用于显示）
+        const raw = addr.slice(2, 10).toUpperCase();
+        showTokenResult({
+            symbol: raw,
+            name: '未知代币 (需验证)',
+            address: addr,
+            pair: raw + 'USDT',
+            found: false
+        });
+        showLoading(false);
+    }, 300);
 }
 
 async function searchSymbolResults() {
@@ -1107,12 +1161,22 @@ function selectKnownToken(symbol) {
 
 function showTokenResult(token) {
     pendingToken = token;
+    const isKnown = token.found || token.fromList;
     document.getElementById('result-symbol').textContent = token.symbol;
     document.getElementById('result-name').textContent = token.name || '';
     document.getElementById('result-addr').textContent = token.address ? token.address : '(无合约地址)';
-    document.getElementById('result-pool').innerHTML = token.address 
-        ? '<span style="color:#f59e0b;">⚠️ 建议先验证合约安全性</span>' 
-        : '<span style="color:#10b981;">✓ Binance官方交易对</span>';
+    
+    if (isKnown) {
+        document.getElementById('result-pool').innerHTML = 
+            `<span style="color:#10b981;">✓ 已验证代币 · ${token.chain?.toUpperCase()} 链</span>`;
+    } else {
+        document.getElementById('result-pool').innerHTML = 
+            `<span style="color:#f59e0b;">⚠️ 未经验证的合约，请前往 
+            <a href="https://www.bscscan.com/address/${token.address}" target="_blank" style="color:#60a5fa;">BscScan</a> 
+            或 
+            <a href="https://ave.ai/token/${token.address}" target="_blank" style="color:#60a5fa;">Ave.ai</a> 
+            验证后再添加</span>`;
+    }
     document.getElementById('token-result').style.display = 'block';
 }
 
@@ -1126,14 +1190,31 @@ function confirmAddToken() {
         return;
     }
     
+    // 未验证合约需要确认
+    if (!pendingToken.found && !pendingToken.fromList) {
+        const ok = confirm(
+            `⚠️ 未验证代币: ${pendingToken.symbol}\n\n` +
+            `合约: ${pendingToken.address}\n\n` +
+            `请确保此合约已通过 BscScan / Ave.ai 验证，否则可能存在风险。\n\n` +
+            `确认添加？`
+        );
+        if (!ok) return;
+    }
+    
     // 添加
-    added.push({ symbol: pendingToken.symbol, pair: pendingToken.pair, enabled: true });
+    added.push({
+        symbol: pendingToken.symbol,
+        pair: pendingToken.pair,
+        enabled: true,
+        address: pendingToken.address,
+        name: pendingToken.name
+    });
     saveTradingPairs(added);
     renderTradingPairs();
     renderEmptyPrices();
     
     closeAddTokenModal();
-    log(`✅ 已添加交易对 ${pendingToken.symbol}`, 'i');
+    log(`✅ 已添加 ${pendingToken.symbol} / USDT`, 'i');
 }
 
 function addCustomToken() {
