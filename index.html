@@ -457,11 +457,37 @@ function chainName(id) {
 
 // ====================== 价格 ======================
 async function fetchPrice(sym, pair) {
+    // CoinCap API - 支持浏览器跨域
+    const COINCAP_MAP = {
+        'BTC': 'bitcoin', 'ETH': 'ethereum', 'BNB': 'binance-coin',
+        'CAKE': 'pancakeswap-token', 'DOGE': 'dogecoin', 'SHIB': 'shiba-inu',
+        'PEPE': 'pepe', 'WBNB': 'wrapped-bitcoin', 'DOT': 'polkadot',
+        'SOL': 'solana', 'XRP': 'ripple', 'FIL': 'filecoin',
+        'LTC': 'litecoin', 'ADA': 'cardano', 'AVAX': 'avalanche-2',
+        'LINK': 'chainlink', 'MATIC': 'matic-network', 'AAVE': 'aave',
+    };
+    
+    const id = COINCAP_MAP[sym] || sym.toLowerCase();
     try {
-        const r = await fetch(`https://api.binance.com/api/v3/ticker/price?symbol=${pair}`);
-        const d = await r.json();
-        return parseFloat(d.price);
-    } catch { return 0; }
+        const r = await fetch(`https://api.coincap.io/v2/assets/${id}`, { mode: 'cors' });
+        if (r.ok) {
+            const d = await r.json();
+            if (d.data && d.data.priceUsd) {
+                return parseFloat(d.data.priceUsd);
+            }
+        }
+    } catch {}
+    
+    // 备选：Binance (可能失败)
+    try {
+        const r = await fetch(`https://api.binance.com/api/v3/ticker/price?symbol=${pair}`, { mode: 'cors' });
+        if (r.ok) {
+            const d = await r.json();
+            return parseFloat(d.price);
+        }
+    } catch {}
+    
+    return 0;
 }
 
 // ====================== 交易币种配置 ======================
@@ -856,26 +882,51 @@ async function searchContract() {
     if (!/^0x[0-9a-fA-F]{40}$/.test(addr)) { showError('无效的合约地址格式'); return; }
     
     showLoading(true);
-    try {
-        // 尝试从Binance获取symbol
-        const r = await fetch(`https://api.binance.com/api/v3/exchangeInfo`, { method: 'GET', mode: 'cors' });
-        if (r.ok) {
-            const data = await r.json();
-            // 通过symbol格式猜测
-            const suffix = addr.slice(-8).replace(/0/g,'X').toUpperCase();
-            const pair = suffix + 'USDT';
-            showTokenResult({ symbol: suffix.replace(/X/g,'0'), name: '代币', address: addr, pair: pair });
-            showLoading(false);
-            return;
-        }
-    } catch(e) {
-        // CORS被阻止时，走备选逻辑
-    }
     
-    // 备选：从地址尾字节生成symbol
-    const suffix = addr.slice(-6).toUpperCase();
-    const clean = suffix.replace(/[^A-Z0-9]/g, 'X');
-    showTokenResult({ symbol: clean || '代币', name: '未知代币', address: addr, pair: clean + 'USDT' });
+    // 先尝试 CoinGecko 合约查询 (BSC链)
+    try {
+        const r = await fetch(`https://api.coingecko.com/api/v3/coins/binancecoin/contract/${addr}`, { mode: 'cors' });
+        if (r.ok) {
+            const d = await r.json();
+            if (d.id) {
+                showTokenResult({ 
+                    symbol: d.symbol.toUpperCase(), 
+                    name: d.name, 
+                    address: addr, 
+                    pair: d.symbol.toUpperCase() + 'USDT' 
+                });
+                showLoading(false);
+                return;
+            }
+        }
+    } catch {}
+    
+    // 再试 Ethereum 链
+    try {
+        const r = await fetch(`https://api.coingecko.com/api/v3/coins/ethereum/contract/${addr}`, { mode: 'cors' });
+        if (r.ok) {
+            const d = await r.json();
+            if (d.id) {
+                showTokenResult({ 
+                    symbol: d.symbol.toUpperCase(), 
+                    name: d.name, 
+                    address: addr, 
+                    pair: d.symbol.toUpperCase() + 'USDT' 
+                });
+                showLoading(false);
+                return;
+            }
+        }
+    } catch {}
+    
+    // 查不到就走备选
+    const raw = addr.slice(2, 16).replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+    showTokenResult({ 
+        symbol: raw.slice(0, 8) || '自定义', 
+        name: '自定义代币', 
+        address: addr, 
+        pair: (raw.slice(0, 8) || 'TOKEN') + 'USDT' 
+    });
     showLoading(false);
 }
 
