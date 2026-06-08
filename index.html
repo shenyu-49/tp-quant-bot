@@ -2,685 +2,663 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TP钱包量化交易机器人</title>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.6.0/dist/css/bootstrap.min.css">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>TP量化机器人</title>
     <style>
         :root {
-            --primary: #2196F3;
-            --success: #4CAF50;
-            --danger: #F44336;
-            --warning: #FF9800;
-            --bg-dark: #1a1a2e;
-            --bg-card: #16213e;
-            --text: #eaeaea;
+            --bg: #0a0e1a;
+            --card: #111827;
+            --border: rgba(255,255,255,0.06);
+            --primary: #3b82f6;
+            --success: #10b981;
+            --danger: #ef4444;
+            --warning: #f59e0b;
+            --text: #f1f5f9;
+            --muted: #64748b;
+            --green: #22c55e;
+            --red: #f43f5e;
         }
+        * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
         body {
-            background: var(--bg-dark);
+            background: var(--bg);
             color: var(--text);
-            font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif;
+            font-family: -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif;
             min-height: 100vh;
+            font-size: 14px;
         }
-        .container { max-width: 960px; }
+        .container { max-width: 500px; margin: 0 auto; padding: 12px; }
         .card {
-            background: var(--bg-card);
-            border: 1px solid rgba(255,255,255,0.1);
-            border-radius: 12px;
-            margin-bottom: 16px;
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            margin-bottom: 12px;
+            overflow: hidden;
         }
         .card-header {
-            background: transparent;
-            border-bottom: 1px solid rgba(255,255,255,0.1);
-            font-weight: bold;
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 13px;
+            font-weight: 600;
         }
-        .btn-primary { background: var(--primary); border: none; }
-        .btn-success { background: var(--success); border: none; }
-        .btn-danger { background: var(--danger); border: none; }
-        .btn-warning { background: var(--warning); border: none; color: #000; }
-        .price-up { color: #F44336; font-weight: bold; }
-        .price-down { color: #4CAF50; font-weight: bold; }
-        .stat-card {
-            background: rgba(255,255,255,0.05);
-            border-radius: 8px;
-            padding: 12px;
+        .card-body { padding: 16px; }
+        .price-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+        .price-item {
+            background: rgba(255,255,255,0.03);
+            border-radius: 12px;
+            padding: 12px 8px;
             text-align: center;
         }
-        .stat-value { font-size: 1.5rem; font-weight: bold; color: #fff; }
-        .stat-label { font-size: 0.85rem; color: #888; }
-        .signal-buy {
-            background: linear-gradient(135deg, #2196F3, #1976D2);
-            color: white;
-            border-radius: 20px;
-            padding: 4px 12px;
-            font-size: 0.8rem;
+        .price-item .sym { font-size: 11px; color: var(--muted); margin-bottom: 4px; }
+        .price-item .val { font-size: 15px; font-weight: 700; }
+        .price-item .sig { font-size: 10px; margin-top: 4px; padding: 2px 6px; border-radius: 8px; display: inline-block; }
+        .sig-buy { background: rgba(59,130,246,0.15); color: #60a5fa; }
+        .sig-sell { background: rgba(239,68,68,0.15); color: #f87171; }
+        .sig-hold { background: rgba(255,255,255,0.06); color: var(--muted); }
+        .stat-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+        .stat-box {
+            background: rgba(255,255,255,0.03);
+            border-radius: 10px;
+            padding: 10px 4px;
+            text-align: center;
         }
-        .signal-sell {
-            background: linear-gradient(135deg, #F44336, #C62828);
-            color: white;
-            border-radius: 20px;
-            padding: 4px 12px;
-            font-size: 0.8rem;
-        }
-        .signal-hold {
+        .stat-box .v { font-size: 14px; font-weight: 700; color: #fff; }
+        .stat-box .l { font-size: 10px; color: var(--muted); margin-top: 2px; }
+        .profit-pos { color: var(--green); }
+        .profit-neg { color: var(--red); }
+        .form-group { margin-bottom: 10px; }
+        .form-group label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+        .form-row { display: flex; gap: 8px; align-items: center; justify-content: space-between; }
+        .form-row span { font-size: 12px; }
+        input[type="range"] {
+            -webkit-appearance: none;
+            width: 100%;
+            height: 4px;
+            border-radius: 2px;
             background: rgba(255,255,255,0.1);
-            color: #888;
-            border-radius: 20px;
-            padding: 4px 12px;
-            font-size: 0.8rem;
+            outline: none;
         }
-        .price-ticker {
-            font-size: 1.8rem;
-            font-weight: bold;
-        }
-        .chart-container { position: relative; height: 200px; }
-        .trade-item {
-            border-left: 3px solid var(--primary);
-            padding-left: 12px;
-            margin-bottom: 8px;
-        }
-        .config-item {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding: 8px 0;
-            border-bottom: 1px solid rgba(255,255,255,0.05);
-        }
-        .wallet-badge {
-            background: rgba(33,150,243,0.2);
-            color: #64B5F6;
-            padding: 4px 12px;
-            border-radius: 20px;
-            font-size: 0.8rem;
-        }
-        .toast-custom {
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            z-index: 9999;
-            animation: slideIn 0.3s ease;
-        }
-        @keyframes slideIn {
-            from { transform: translateX(100%); opacity: 0; }
-            to { transform: translateX(0); opacity: 1; }
-        }
-        .progress-bar-buy { background: linear-gradient(90deg, #2196F3, #4CAF50); }
-        .progress-bar-sell { background: linear-gradient(90deg, #F44336, #FF9800); }
-        #log-console {
-            background: #0a0a15;
-            border-radius: 8px;
-            padding: 12px;
-            font-family: 'Courier New', monospace;
-            font-size: 0.75rem;
-            max-height: 200px;
-            overflow-y: auto;
-        }
-        .log-entry { margin: 2px 0; }
-        .log-time { color: #666; }
-        .log-info { color: #4CAF50; }
-        .log-warn { color: #FF9800; }
-        .log-error { color: #F44336; }
-        .live-dot {
-            width: 8px; height: 8px;
-            background: #4CAF50;
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 18px; height: 18px;
             border-radius: 50%;
-            display: inline-block;
-            animation: pulse 2s infinite;
+            background: var(--primary);
+            cursor: pointer;
         }
-        @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.4; }
+        .btn-row { display: flex; gap: 8px; }
+        .btn {
+            flex: 1;
+            padding: 12px;
+            border: none;
+            border-radius: 12px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
         }
+        .btn-primary { background: var(--primary); color: white; }
+        .btn-success { background: var(--success); color: white; }
+        .btn-danger { background: var(--danger); color: white; }
+        .btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text); }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .trade-list { max-height: 200px; overflow-y: auto; }
+        .trade-item {
+            padding: 8px 0;
+            border-bottom: 1px solid var(--border);
+            font-size: 12px;
+        }
+        .trade-item:last-child { border-bottom: none; }
+        .trade-item .top { display: flex; justify-content: space-between; margin-bottom: 2px; }
+        .wallet-banner {
+            background: linear-gradient(135deg, #1e3a5f, #0f2744);
+            border: 1px solid rgba(59,130,246,0.3);
+            border-radius: 12px;
+            padding: 16px;
+            text-align: center;
+            margin-bottom: 12px;
+        }
+        .wallet-banner.connected { background: linear-gradient(135deg, #064e3b, #022c22); border-color: rgba(16,185,129,0.3); }
+        .wallet-banner .addr { font-size: 13px; color: #93c5fd; font-family: monospace; }
+        .wallet-banner.connected .addr { color: #6ee7b7; }
+        .log-box {
+            background: #050810;
+            border-radius: 8px;
+            padding: 8px;
+            font-family: 'Courier New', monospace;
+            font-size: 11px;
+            max-height: 150px;
+            overflow-y: auto;
+            line-height: 1.6;
+        }
+        .log-line { margin: 1px 0; }
+        .log-ts { color: #334155; margin-right: 4px; }
+        .log-i { color: #10b981; }
+        .log-w { color: #f59e0b; }
+        .log-e { color: #ef4444; }
+        .live-badge {
+            display: inline-flex; align-items: center; gap: 4px;
+            font-size: 11px; color: var(--muted);
+        }
+        .live-dot {
+            width: 6px; height: 6px; border-radius: 50%;
+            background: var(--success);
+        }
+        .live-dot.running { animation: pulse 1.5s infinite; }
+        @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+        .empty { text-align: center; color: var(--muted); padding: 24px; font-size: 13px; }
+        .param-val { color: #60a5fa; font-weight: 600; }
+        .signal-panel {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            font-size: 12px;
+        }
+        .signal-item {
+            background: rgba(255,255,255,0.03);
+            border-radius: 8px;
+            padding: 8px 10px;
+            display: flex;
+            justify-content: space-between;
+        }
+        .signal-item .k { color: var(--muted); }
+        .signal-item .v { font-weight: 600; }
     </style>
 </head>
 <body>
-    <!-- 导航栏 -->
-    <nav class="navbar navbar-expand-lg navbar-dark" style="background: rgba(0,0,0,0.3);">
-        <div class="container">
-            <a class="navbar-brand" href="#">🤖 TP量化机器人</a>
-            <div class="ml-auto d-flex align-items-center">
-                <span id="live-indicator" class="mr-3" style="display:none;">
-                    <span class="live-dot"></span> <span id="live-status">LIVE</span>
-                </span>
-                <button id="btn-connect" class="btn btn-sm btn-primary" onclick="connectWallet()">
-                    连接TP钱包
-                </button>
-            </div>
+<div class="container">
+
+    <!-- 钱包连接 -->
+    <div id="wallet-banner" class="wallet-banner">
+        <div style="font-size:13px;color:#93c5fd;margin-bottom:8px;">🔗 TP钱包未连接</div>
+        <div style="font-size:11px;color:#475569;">连接后可开始自动量化交易</div>
+        <button class="btn btn-primary" style="margin-top:12px;width:100%;" onclick="connectWallet()">连接TP钱包</button>
+    </div>
+
+    <!-- 实时价格 -->
+    <div class="card">
+        <div class="card-header">
+            <span>实时行情</span>
+            <span id="price-time" class="live-badge"><span class="live-dot"></span>--:--:--</span>
         </div>
-    </nav>
-
-    <div class="container mt-4">
-        <!-- 钱包状态 -->
-        <div class="card" id="wallet-card">
-            <div class="card-body text-center py-3">
-                <div id="wallet-disconnected">
-                    <span class="text-muted">🔗 未连接钱包</span>
-                    <br>
-                    <small class="text-muted">连接TP钱包后开始自动量化交易</small>
+        <div class="card-body">
+            <div class="price-grid">
+                <div class="price-item">
+                    <div class="sym">BTC</div>
+                    <div class="val" id="p-btc">--</div>
+                    <div class="sig sig-hold" id="s-btc">--</div>
                 </div>
-                <div id="wallet-connected" style="display:none;">
-                    <span class="wallet-badge" id="wallet-address"></span>
-                    <span class="ml-3" id="wallet-balance"></span>
-                    <span class="ml-3" id="wallet-network"></span>
+                <div class="price-item">
+                    <div class="sym">ETH</div>
+                    <div class="val" id="p-eth">--</div>
+                    <div class="sig sig-hold" id="s-eth">--</div>
                 </div>
-            </div>
-        </div>
-
-        <!-- 实时行情 -->
-        <div class="row">
-            <div class="col-md-4">
-                <div class="card">
-                    <div class="card-body text-center">
-                        <div class="stat-label">BTC/USDT</div>
-                        <div class="price-ticker" id="price-btc" style="color:#F7931A;">--</div>
-                        <div id="signal-btc" class="signal-hold mt-2">监控中</div>
-                    </div>
+                <div class="price-item">
+                    <div class="sym">BNB</div>
+                    <div class="val" id="p-bnb">--</div>
+                    <div class="sig sig-hold" id="s-bnb">--</div>
                 </div>
-            </div>
-            <div class="col-md-4">
-                <div class="card">
-                    <div class="card-body text-center">
-                        <div class="stat-label">ETH/USDT</div>
-                        <div class="price-ticker" id="price-eth" style="color:#627EEA;">--</div>
-                        <div id="signal-eth" class="signal-hold mt-2">监控中</div>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-4">
-                <div class="card">
-                    <div class="card-body text-center">
-                        <div class="stat-label">BNB/USDT</div>
-                        <div class="price-ticker" id="price-bnb" style="color:#F3BA2F;">--</div>
-                        <div id="signal-bnb" class="signal-hold mt-2">监控中</div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- 策略状态 -->
-        <div class="card">
-            <div class="card-header d-flex justify-content-between align-items-center">
-                <span>📊 策略状态</span>
-                <div>
-                    <button class="btn btn-sm btn-success" onclick="startBot()">▶ 启动</button>
-                    <button class="btn btn-sm btn-danger" onclick="stopBot()">■ 停止</button>
-                </div>
-            </div>
-            <div class="card-body">
-                <div class="row">
-                    <div class="col-3">
-                        <div class="stat-card">
-                            <div class="stat-value" id="stat-total-profit">0.00</div>
-                            <div class="stat-label">累计收益 (USDT)</div>
-                        </div>
-                    </div>
-                    <div class="col-3">
-                        <div class="stat-card">
-                            <div class="stat-value" id="stat-roi">0.00%</div>
-                            <div class="stat-label">收益率</div>
-                        </div>
-                    </div>
-                    <div class="col-3">
-                        <div class="stat-card">
-                            <div class="stat-value" id="stat-trades">0</div>
-                            <div class="stat-label">交易次数</div>
-                        </div>
-                    </div>
-                    <div class="col-3">
-                        <div class="stat-card">
-                            <div class="stat-value" id="stat-holdings">0</div>
-                            <div class="stat-label">当前持仓</div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <div class="row">
-            <!-- 参数配置 -->
-            <div class="col-md-6">
-                <div class="card">
-                    <div class="card-header">⚙️ 策略参数</div>
-                    <div class="card-body">
-                        <div class="config-item">
-                            <span>初始资金 (USDT)</span>
-                            <input type="number" id="cfg-capital" value="1000" class="form-control form-control-sm" style="width:120px;">
-                        </div>
-                        <div class="config-item">
-                            <span>每笔交易比例</span>
-                            <div class="input-group input-group-sm" style="width:140px;">
-                                <input type="number" id="cfg-per-trade" value="10" class="form-control">
-                                <div class="input-group-append"><span class="input-group-text">%</span></div>
-                            </div>
-                        </div>
-                        <div class="config-item">
-                            <span>止盈比例</span>
-                            <div class="input-group input-group-sm" style="width:140px;">
-                                <input type="number" id="cfg-profit" value="2" step="0.1" class="form-control">
-                                <div class="input-group-append"><span class="input-group-text">%</span></div>
-                            </div>
-                        </div>
-                        <div class="config-item">
-                            <span>买入回调比例</span>
-                            <div class="input-group input-group-sm" style="width:140px;">
-                                <input type="number" id="cfg-drop" value="1.5" step="0.1" class="form-control">
-                                <div class="input-group-append"><span class="input-group-text">%</span></div>
-                            </div>
-                        </div>
-                        <div class="config-item">
-                            <span>止损比例</span>
-                            <div class="input-group input-group-sm" style="width:140px;">
-                                <input type="number" id="cfg-stop" value="5" step="0.1" class="form-control">
-                                <div class="input-group-append"><span class="input-group-text">%</span></div>
-                            </div>
-                        </div>
-                        <div class="config-item">
-                            <span>检查间隔</span>
-                            <div class="input-group input-group-sm" style="width:140px;">
-                                <input type="number" id="cfg-interval" value="10" class="form-control">
-                                <div class="input-group-append"><span class="input-group-text">秒</span></div>
-                            </div>
-                        </div>
-                        <button class="btn btn-sm btn-primary mt-2" onclick="saveConfig()">💾 保存配置</button>
-                    </div>
-                </div>
-            </div>
-
-            <!-- 交易历史 -->
-            <div class="col-md-6">
-                <div class="card">
-                    <div class="card-header">📜 交易历史</div>
-                    <div class="card-body" style="max-height: 300px; overflow-y: auto;">
-                        <div id="trade-history">
-                            <div class="text-muted text-center py-4">暂无交易记录</div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- 实时日志 -->
-        <div class="card">
-            <div class="card-header d-flex justify-content-between align-items-center">
-                <span>💻 运行日志</span>
-                <button class="btn btn-sm btn-outline-secondary" onclick="clearLog()">清除</button>
-            </div>
-            <div class="card-body">
-                <div id="log-console"></div>
             </div>
         </div>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.6.0/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.0/dist/ethers.min.js"></script>
-    <script src="tp-wallet.js"></script>
-    <script>
-        // ========== 全局状态 ==========
-        let botState = {
-            running: false,
-            address: '',
-            chainId: '',
-            config: {
-                initial_capital: 1000,
-                per_trade_ratio: 0.1,
-                profit_rate: 0.02,
-                buy_drop_rate: 0.015,
-                stop_loss_rate: 0.05,
-                check_interval: 10
-            },
-            positions: {},
-            trades: [],
-            profit: 0,
-            prices: { BTC: 0, ETH: 0, BNB: 0 },
-            lastBuyPrices: { BTC: 0, ETH: 0, BNB: 0 },
-            totalBought: { BTC: 0, ETH: 0, BNB: 0 },
-            totalSold: { BTC: 0, ETH: 0, BNB: 0 }
-        };
+    <!-- 账户状态 -->
+    <div class="card">
+        <div class="card-header">
+            <span>账户状态</span>
+            <span class="live-badge"><span class="live-dot" id="bot-dot"></span><span id="bot-status-text">已停止</span></span>
+        </div>
+        <div class="card-body">
+            <div class="stat-row">
+                <div class="stat-box">
+                    <div class="v" id="st-profit">0.00</div>
+                    <div class="l">累计收益</div>
+                </div>
+                <div class="stat-box">
+                    <div class="v" id="st-roi">0.0%</div>
+                    <div class="l">收益率</div>
+                </div>
+                <div class="stat-box">
+                    <div class="v" id="st-trades">0</div>
+                    <div class="l">交易数</div>
+                </div>
+                <div class="stat-box">
+                    <div class="v" id="st-hold">0</div>
+                    <div class="l">持仓</div>
+                </div>
+            </div>
+            <!-- 信号面板 -->
+            <div class="signal-panel" style="margin-top:12px;">
+                <div class="signal-item"><span class="k">买入阈值</span><span class="v" id="sig-buy">--</span></div>
+                <div class="signal-item"><span class="k">卖出阈值</span><span class="v" id="sig-sell">--</span></div>
+                <div class="signal-item"><span class="k">止损阈值</span><span class="v" id="sig-stop">--</span></div>
+                <div class="signal-item"><span class="k">上次买入</span><span class="v" id="sig-last">--</span></div>
+            </div>
+        </div>
+    </div>
 
-        let wsConnection = null;
-        let priceInterval = null;
+    <!-- 参数配置 -->
+    <div class="card">
+        <div class="card-header"><span>策略参数</span><span style="color:var(--muted);font-weight:400;font-size:11px;">实时生效</span></div>
+        <div class="card-body">
+            <div class="form-group">
+                <div class="form-row">
+                    <span>初始资金 (USDT)</span>
+                    <span class="param-val" id="lbl-capital">1000</span>
+                </div>
+                <input type="range" id="sl-capital" min="100" max="10000" step="100" value="1000">
+            </div>
+            <div class="form-group">
+                <div class="form-row">
+                    <span>每笔比例</span>
+                    <span class="param-val" id="lbl-per">10%</span>
+                </div>
+                <input type="range" id="sl-per" min="5" max="50" step="5" value="10">
+            </div>
+            <div class="form-group">
+                <div class="form-row">
+                    <span>止盈比例</span>
+                    <span class="param-val" id="lbl-profit">2.0%</span>
+                </div>
+                <input type="range" id="sl-profit" min="0.5" max="10" step="0.5" value="2">
+            </div>
+            <div class="form-group">
+                <div class="form-row">
+                    <span>买入回调</span>
+                    <span class="param-val" id="lbl-drop">1.5%</span>
+                </div>
+                <input type="range" id="sl-drop" min="0.5" max="5" step="0.5" value="1.5">
+            </div>
+            <div class="form-group">
+                <div class="form-row">
+                    <span>止损比例</span>
+                    <span class="param-val" id="lbl-stop">5.0%</span>
+                </div>
+                <input type="range" id="sl-stop" min="1" max="20" step="1" value="5">
+            </div>
+        </div>
+    </div>
 
-        // ========== TP钱包连接 ==========
-        async function connectWallet() {
-            const btn = document.getElementById('btn-connect');
-            btn.innerHTML = '连接中...';
-            btn.disabled = true;
+    <!-- 控制 -->
+    <div class="card-body" style="padding:0 0 4px;">
+        <div class="btn-row">
+            <button class="btn btn-success" id="btn-start" onclick="startBot()">▶ 启动机器人</button>
+            <button class="btn btn-danger" id="btn-stop" onclick="stopBot()" disabled>■ 停止</button>
+        </div>
+    </div>
 
-            try {
-                const result = await tpWallet.connect();
+    <!-- 交易历史 -->
+    <div class="card">
+        <div class="card-header">
+            <span>交易历史</span>
+            <span id="trade-count" style="font-size:11px;color:var(--muted);">0笔</span>
+        </div>
+        <div class="card-body">
+            <div class="trade-list" id="trade-list">
+                <div class="empty">暂无交易记录</div>
+            </div>
+        </div>
+    </div>
 
-                if (result.success) {
-                    botState.address = result.address;
-                    botState.chainId = result.chainId;
+    <!-- 运行日志 -->
+    <div class="card">
+        <div class="card-header">
+            <span>运行日志</span>
+            <button style="background:none;border:none;color:var(--muted);font-size:11px;cursor:pointer;" onclick="clearLog()">清除</button>
+        </div>
+        <div class="card-body">
+            <div class="log-box" id="log-box"></div>
+        </div>
+    </div>
 
-                    document.getElementById('wallet-connected').style.display = 'block';
-                    document.getElementById('wallet-disconnected').style.display = 'none';
-                    document.getElementById('wallet-address').textContent = formatAddress(result.address);
-                    document.getElementById('wallet-network').textContent = getNetworkName(result.chainId);
+</div>
 
-                    // 获取余额
-                    const balance = await tpWallet.getBalance(result.address);
-                    document.getElementById('wallet-balance').textContent = balance.toFixed(4) + ' BNB';
+<script>
+// ====================== 核心引擎 ======================
+const cfg = {
+    capital: 1000,
+    perTrade: 0.10,
+    profitRate: 0.02,
+    buyDropRate: 0.015,
+    stopLossRate: 0.05,
+    checkInterval: 5000,
+};
 
-                    btn.innerHTML = '✓ 已连接';
-                    btn.className = 'btn btn-sm btn-success';
+const state = {
+    running: false,
+    address: '',
+    chainId: '',
+    profit: 0,
+    trades: [],
+    prices: { BTC: 0, ETH: 0, BNB: 0 },
+    lastBuy: { BTC: 0, ETH: 0, BNB: 0 },
+    totalBought: { BTC: 0, ETH: 0, BNB: 0 },
+    totalSold: { BTC: 0, ETH: 0, BNB: 0 },
+    firstBuyDone: { BTC: false, ETH: false, BNB: false },
+};
 
-                    log('钱包连接成功: ' + formatAddress(result.address), 'info');
+let priceTimer = null;
+let botTimer = null;
 
-                    // 开始获取价格
-                    startPriceFeed();
+// ====================== TP钱包 ======================
+function getTPProvider() {
+    if (window.dapp) return window.dapp;
+    if (window.ethereum?.isTokenPocket) return window.ethereum;
+    if (window.tp) return window.tp;
+    return null;
+}
 
-                } else {
-                    throw new Error(result.error);
-                }
-            } catch (error) {
-                log('钱包连接失败: ' + error.message, 'error');
-                btn.innerHTML = '重试连接';
-            }
+async function connectWallet() {
+    const provider = getTPProvider();
+    if (!provider) {
+        log('请安装TP钱包', 'e');
+        alert('请先安装 TP钱包\n\n在TP钱包内打开此页面，或使用内置浏览器');
+        return;
+    }
+    try {
+        const accounts = await provider.request({ method: 'eth_requestAccounts' });
+        if (!accounts?.length) throw new Error('无账户');
+        state.address = accounts[0];
+        state.chainId = await provider.request({ method: 'eth_chainId' }).catch(() => '0x38');
+        showWalletConnected();
+        log('TP钱包已连接: ' + addr(state.address), 'i');
+    } catch (e) {
+        log('连接失败: ' + e.message, 'e');
+    }
+}
 
-            btn.disabled = false;
+function showWalletConnected() {
+    const banner = document.getElementById('wallet-banner');
+    banner.className = 'wallet-banner connected';
+    banner.innerHTML = `
+        <div style="font-size:12px;color:#6ee7b7;margin-bottom:4px;">✓ 已连接</div>
+        <div class="addr">${addr(state.address)}</div>
+        <div style="font-size:11px;color:#475569;margin-top:4px;">链: ${chainName(state.chainId)}</div>
+    `;
+}
+
+function addr(a) { return a ? a.slice(0,6)+'...'+a.slice(-4) : ''; }
+function chainName(id) {
+    const m = { '0x38':'BSC','0x1':'ETH','0x56':'BSC','0x61':'Testnet' };
+    return m[id] || 'BSC';
+}
+
+// ====================== 价格 ======================
+async function fetchPrice(sym, pair) {
+    try {
+        const r = await fetch(`https://api.binance.com/api/v3/ticker/price?symbol=${pair}`);
+        const d = await r.json();
+        return parseFloat(d.price);
+    } catch { return 0; }
+}
+
+async function updatePrices() {
+    const syms = [['BTC','BTCUSDT'],['ETH','ETHUSDT'],['BNB','BNBUSDT']];
+    let updated = false;
+    for (const [k, p] of syms) {
+        const price = await fetchPrice(k, p);
+        if (price > 0) {
+            state.prices[k] = price;
+            document.getElementById('p-'+k.toLowerCase()).textContent = fmt(price, k);
+            updated = true;
         }
+    }
+    if (updated) {
+        document.getElementById('price-time').innerHTML = `<span class="live-dot"></span>${new Date().toLocaleTimeString()}`;
+    }
+}
 
-        // ========== 价格获取 ==========
-        async function fetchPrice(symbol) {
-            try {
-                // 使用Binance公开API
-                const response = await fetch(`https://api.binance.com/api/v3/ticker/price?symbol=${symbol}USDT`);
-                const data = await response.json();
-                return parseFloat(data.price);
-            } catch (error) {
-                return null;
-            }
+function fmt(price, sym) {
+    if (sym === 'BNB' && price < 10) return price.toFixed(4);
+    if (price >= 10000) return price.toLocaleString('en', {maximumFractionDigits:0});
+    if (price >= 100) return price.toFixed(2);
+    return price.toFixed(4);
+}
+
+// ====================== 策略引擎 ======================
+function checkSignal(sym) {
+    const price = state.prices[sym];
+    if (!price) return null;
+    const last = state.lastBuy[sym];
+    const hold = state.totalBought[sym];
+
+    if (!state.firstBuyDone[sym]) {
+        return { type: 'first_buy', text: '🛒 可买入', cls: 'sig-buy' };
+    }
+    if (hold > 0) {
+        const take = last * (1 + cfg.profitRate);
+        const stop = last * (1 - cfg.stopLossRate);
+        const drop = last * (1 - cfg.buyDropRate);
+        if (price >= take) return { type: 'sell_tp', text: '🎯 止盈', cls: 'sig-sell', take, stop, drop };
+        if (price <= stop) return { type: 'sell_sl', text: '⚠️ 止损', cls: 'sig-sell', take, stop, drop };
+        if (price <= drop) return { type: 'buy_cb', text: '📉 回调买', cls: 'sig-buy', take, stop, drop };
+        return { type: 'hold', text: '📊 持', cls: 'sig-hold', take, stop, drop };
+    } else {
+        const drop = last * (1 - cfg.buyDropRate);
+        return { type: 'wait', text: last > 0 && price <= drop ? '🛒 买入' : '📊 等待', cls: last > 0 && price <= drop ? 'sig-buy' : 'sig-hold', take: last*(1+cfg.profitRate), stop: last*(1-cfg.stopLossRate), drop };
+    }
+}
+
+function runBotCycle() {
+    const syms = ['BTC','ETH','BNB'];
+    for (const sym of syms) {
+        const sig = checkSignal(sym);
+        if (!sig) continue;
+
+        // 更新信号显示
+        const el = document.getElementById('s-'+sym.toLowerCase());
+        el.textContent = sig.text;
+        el.className = 'sig '+sig.cls;
+
+        if (!state.running) continue;
+        if (!state.address) continue;
+
+        // 更新阈值
+        if (sig.drop) document.getElementById('sig-buy').textContent = fmt(sig.drop, sym);
+        if (sig.take) document.getElementById('sig-sell').textContent = fmt(sig.take, sym);
+        if (sig.stop) document.getElementById('sig-stop').textContent = fmt(sig.stop, sym);
+        document.getElementById('sig-last').textContent = state.lastBuy[sym] ? fmt(state.lastBuy[sym], sym) : '--';
+
+        // 执行交易
+        if (sig.type === 'first_buy' || sig.type === 'buy_cb') {
+            execBuy(sym, sig);
+        } else if (sig.type === 'sell_tp' || sig.type === 'sell_sl') {
+            execSell(sym, sig);
         }
+    }
+    updateStats();
+}
 
-        async function updatePrices() {
-            const symbols = [
-                { key: 'BTC', symbol: 'BTCUSDT' },
-                { key: 'ETH', symbol: 'ETHUSDT' },
-                { key: 'BNB', symbol: 'BNBUSDT' }
-            ];
+function execBuy(sym, sig) {
+    const price = state.prices[sym];
+    if (!price) return;
+    const amount = (cfg.capital + state.profit) * cfg.perTrade / price;
+    const fee = amount * price * 0.001;
 
-            for (const { key, symbol } of symbols) {
-                const price = await fetchPrice(symbol);
-                if (price) {
-                    const oldPrice = botState.prices[key];
-                    botState.prices[key] = price;
+    const trade = {
+        id: Date.now(),
+        time: new Date().toLocaleTimeString(),
+        sym,
+        side: 'BUY',
+        price,
+        amount,
+        fee,
+        note: sig.type === 'first_buy' ? '首买入' : '回调买入'
+    };
+    state.trades.push(trade);
+    state.lastBuy[sym] = price;
+    state.totalBought[sym] += amount;
+    state.firstBuyDone[sym] = true;
 
-                    const el = document.getElementById(`price-${key.toLowerCase()}`);
-                    if (el) {
-                        el.textContent = formatPrice(price, key);
-                        el.className = `price-ticker ${price > oldPrice ? 'price-up' : price < oldPrice ? 'price-down' : ''}`;
-                    }
+    log(`🛒 买入 ${sym}: ${amount.toFixed(6)} @ ${fmt(price,sym)} (${trade.note})`, 'i');
+    renderTrades();
+}
 
-                    // 检查交易信号
-                    if (botState.running) {
-                        checkSignals(key, price);
-                    }
-                }
-            }
-        }
+function execSell(sym, sig) {
+    const price = state.prices[sym];
+    const amount = state.totalBought[sym];
+    if (!price || amount <= 0) return;
+    const value = amount * price;
+    const cost = amount * state.lastBuy[sym];
+    const fee = value * 0.001;
+    const profit = value - cost - fee;
 
-        function formatPrice(price, key) {
-            if (price >= 1000) return price.toFixed(2);
-            if (price >= 1) return price.toFixed(4);
-            return price.toFixed(6);
-        }
+    const trade = {
+        id: Date.now(),
+        time: new Date().toLocaleTimeString(),
+        sym,
+        side: 'SELL',
+        price,
+        amount,
+        fee,
+        profit,
+        note: sig.type === 'sell_tp' ? '止盈' : '止损'
+    };
+    state.trades.push(trade);
+    state.profit += profit;
+    state.totalSold[sym] += amount;
+    state.totalBought[sym] = 0;
+    state.lastBuy[sym] = 0;
+    state.firstBuyDone[sym] = false;
 
-        function startPriceFeed() {
-            updatePrices();
-            priceInterval = setInterval(updatePrices, 5000);
-            document.getElementById('live-indicator').style.display = 'inline-flex';
-            log('价格推送已启动', 'info');
-        }
+    const cls = profit >= 0 ? 'i' : 'e';
+    log(`💰 卖出 ${sym}: ${amount.toFixed(6)} @ ${fmt(price,sym)} | ${profit>=0?'+':''}${profit.toFixed(2)} USDT (${trade.note})`, cls);
+    renderTrades();
+}
 
-        // ========== 交易信号检查 ==========
-        function checkSignals(key, currentPrice) {
-            const cfg = botState.config;
-            const lastBuy = botState.lastBuyPrices[key];
-            const signalEl = document.getElementById(`signal-${key.toLowerCase()}`);
+// ====================== UI ======================
+function updateStats() {
+    const profitEl = document.getElementById('st-profit');
+    profitEl.textContent = (state.profit >= 0 ? '+' : '') + state.profit.toFixed(2);
+    profitEl.className = 'v ' + (state.profit >= 0 ? 'profit-pos' : 'profit-neg');
+    document.getElementById('st-roi').textContent = (state.profit / cfg.capital * 100).toFixed(2) + '%';
+    document.getElementById('st-trades').textContent = state.trades.length;
+    let totalHold = 0;
+    for (const k in state.totalBought) totalHold += state.totalBought[k];
+    document.getElementById('st-hold').textContent = totalHold > 0 ? totalHold.toFixed(4) : '0';
+}
 
-            if (lastBuy === 0) {
-                // 首次买入机会（价格相对较低时）
-                signalEl.className = 'signal-buy';
-                signalEl.textContent = '📊 等待买入信号';
-                return;
-            }
+function renderTrades() {
+    const list = document.getElementById('trade-list');
+    document.getElementById('trade-count').textContent = state.trades.length + '笔';
+    if (!state.trades.length) {
+        list.innerHTML = '<div class="empty">暂无交易记录</div>';
+        return;
+    }
+    list.innerHTML = state.trades.slice().reverse().slice(0,30).map(t => {
+        const pStr = t.side === 'SELL'
+            ? `<span style="color:${t.profit>=0?'#22c55e':'#f43f5e'}">${t.profit>=0?'+':''}${t.profit?.toFixed(2)} USDT</span>`
+            : `<span style="color:#64748b">手续费: ${(t.fee||0).toFixed(4)}</span>`;
+        return `<div class="trade-item">
+            <div class="top">
+                <span style="color:${t.side==='BUY'?'#60a5fa':'#f87171'};font-weight:600">${t.side==='BUY'?'🛒买入':'💰卖出'}</span>
+                <span style="color:#475569">${t.time}</span>
+            </div>
+            <div style="color:#94a3b8">${t.sym} · ${t.amount.toFixed(6)} @ ${fmt(t.price,t.sym)}</div>
+            <div>${pStr} <span style="color:#475569">· ${t.note}</span></div>
+        </div>`;
+    }).join('');
+}
 
-            // 计算各种阈值
-            const buyDropThreshold = lastBuy * (1 - cfg.buy_drop_rate);
-            const takeProfitThreshold = lastBuy * (1 + cfg.profit_rate);
-            const stopLossThreshold = lastBuy * (1 - cfg.stop_loss_rate);
+function startBot() {
+    if (!state.address) {
+        log('请先连接TP钱包', 'w');
+        return;
+    }
+    state.running = true;
+    document.getElementById('bot-status-text').textContent = '运行中';
+    document.getElementById('bot-dot').className = 'live-dot running';
+    document.getElementById('btn-start').disabled = true;
+    document.getElementById('btn-stop').disabled = false;
+    log('🤖 机器人已启动', 'i');
+    priceTimer = setInterval(updatePrices, 4000);
+    botTimer = setInterval(runBotCycle, cfg.checkInterval);
+    updatePrices();
+}
 
-            if (botState.totalBought[key] > 0) {
-                // 有持仓
-                if (currentPrice >= takeProfitThreshold) {
-                    // 止盈信号
-                    executeSell(key, currentPrice, 'take_profit');
-                    signalEl.className = 'signal-sell';
-                    signalEl.textContent = '🎯 止盈信号';
-                } else if (currentPrice <= stopLossThreshold) {
-                    // 止损信号
-                    executeSell(key, currentPrice, 'stop_loss');
-                    signalEl.className = 'signal-sell';
-                    signalEl.textContent = '⚠️ 止损信号';
-                } else if (currentPrice <= buyDropThreshold) {
-                    // 回调买入信号
-                    executeBuy(key, currentPrice, 'callback_buy');
-                    signalEl.className = 'signal-buy';
-                    signalEl.textContent = '📉 回调买入信号';
-                } else {
-                    signalEl.className = 'signal-hold';
-                    signalEl.textContent = '📊 持仓中';
-                }
-            } else {
-                // 无持仓
-                if (currentPrice <= buyDropThreshold) {
-                    executeBuy(key, currentPrice, 'init_buy');
-                    signalEl.className = 'signal-buy';
-                    signalEl.textContent = '🛒 买入信号';
-                } else {
-                    signalEl.className = 'signal-hold';
-                    signalEl.textContent = '📊 等待机会';
-                }
-            }
-        }
+function stopBot() {
+    state.running = false;
+    clearInterval(priceTimer);
+    clearInterval(botTimer);
+    document.getElementById('bot-status-text').textContent = '已停止';
+    document.getElementById('bot-dot').className = 'live-dot';
+    document.getElementById('btn-start').disabled = false;
+    document.getElementById('btn-stop').disabled = true;
+    log('⏹ 机器人已停止', 'w');
+}
 
-        function executeBuy(key, price, reason) {
-            const cfg = botState.config;
-            const tradeAmount = (botState.config.initial_capital + botState.profit) * cfg.per_trade_ratio / price;
-            const value = tradeAmount * price;
+// ====================== 参数滑动 ======================
+function bindSlider(id, lblId, fmt, setter) {
+    const el = document.getElementById(id);
+    const lbl = document.getElementById(lblId);
+    el.addEventListener('input', () => {
+        const v = parseFloat(el.value);
+        lbl.textContent = fmt(v);
+        setter(v);
+    });
+}
 
-            const trade = {
-                id: Date.now(),
-                time: new Date().toLocaleString(),
-                symbol: key + '/USDT',
-                side: 'BUY',
-                price: price,
-                amount: tradeAmount,
-                value: value,
-                reason: reason
-            };
+bindSlider('sl-capital', 'lbl-capital', v => v, v => cfg.capital = v);
+bindSlider('sl-per', 'lbl-per', v => v+'%', v => cfg.perTrade = v/100);
+bindSlider('sl-profit', 'lbl-profit', v => v+'%', v => cfg.profitRate = v/100);
+bindSlider('sl-drop', 'lbl-drop', v => v+'%', v => cfg.buyDropRate = v/100);
+bindSlider('sl-stop', 'lbl-stop', v => v+'%', v => cfg.stopLossRate = v/100);
 
-            botState.trades.push(trade);
-            botState.lastBuyPrices[key] = price;
-            botState.totalBought[key] += tradeAmount;
+// ====================== 日志 ======================
+function log(msg, level='i') {
+    const box = document.getElementById('log-box');
+    const ts = new Date().toLocaleTimeString();
+    const cls = { i:'log-i', w:'log-w', e:'log-e' }[level] || 'log-i';
+    const line = document.createElement('div');
+    line.className = 'log-line';
+    line.innerHTML = `<span class="log-ts">${ts}</span><span class="${cls}">${msg}</span>`;
+    box.appendChild(line);
+    box.scrollTop = box.scrollHeight;
+    if (box.children.length > 200) box.removeChild(box.firstChild);
+}
 
-            log(`🛒 买入 ${key}: ${tradeAmount.toFixed(6)} @ ${price} (${reason})`, 'info');
-            updateTradeHistory();
-            updateStats();
-        }
+function clearLog() {
+    document.getElementById('log-box').innerHTML = '';
+    log('日志已清除', 'i');
+}
 
-        function executeSell(key, price, reason) {
-            const amount = botState.totalBought[key];
-            if (amount <= 0) return;
+// ====================== 初始化 ======================
+log('📱 TP量化机器人初始化完成', 'i');
+log('⚠️ 请连接TP钱包后启动机器人', 'w');
+// 预加载一次价格
+updatePrices();
+setInterval(updatePrices, 15000);
 
-            const avgBuyPrice = botState.lastBuyPrices[key];
-            const value = amount * price;
-            const cost = amount * avgBuyPrice;
-            const profit = value - cost;
-            const fee = value * 0.001;
+// 保存/恢复状态
+try {
+    const saved = localStorage.getItem('tpquant_v1');
+    if (saved) {
+        const d = JSON.parse(saved);
+        Object.assign(state, d.state);
+        Object.assign(cfg, d.cfg);
+        document.getElementById('sl-capital').value = cfg.capital;
+        document.getElementById('lbl-capital').textContent = cfg.capital;
+        document.getElementById('sl-per').value = cfg.perTrade * 100;
+        document.getElementById('lbl-per').textContent = (cfg.perTrade*100)+'%';
+        document.getElementById('sl-profit').value = cfg.profitRate * 100;
+        document.getElementById('lbl-profit').textContent = (cfg.profitRate*100)+'%';
+        document.getElementById('sl-drop').value = cfg.buyDropRate * 100;
+        document.getElementById('lbl-drop').textContent = (cfg.buyDropRate*100)+'%';
+        document.getElementById('sl-stop').value = cfg.stopLossRate * 100;
+        document.getElementById('lbl-stop').textContent = (cfg.stopLossRate*100)+'%';
+        renderTrades();
+        updateStats();
+        log('📂 已恢复上次的策略状态', 'i');
+    }
+} catch(e) {}
 
-            const trade = {
-                id: Date.now(),
-                time: new Date().toLocaleString(),
-                symbol: key + '/USDT',
-                side: 'SELL',
-                price: price,
-                amount: amount,
-                value: value,
-                profit: profit - fee,
-                reason: reason
-            };
-
-            botState.trades.push(trade);
-            botState.profit += profit - fee;
-            botState.totalSold[key] += amount;
-            botState.totalBought[key] = 0;
-            botState.lastBuyPrices[key] = 0;
-
-            log(`💰 卖出 ${key}: ${amount.toFixed(6)} @ ${price} | 盈利: ${(profit - fee).toFixed(2)} USDT (${reason})`, 'info');
-            updateTradeHistory();
-            updateStats();
-        }
-
-        // ========== UI更新 ==========
-        function updateTradeHistory() {
-            const container = document.getElementById('trade-history');
-            if (botState.trades.length === 0) {
-                container.innerHTML = '<div class="text-muted text-center py-4">暂无交易记录</div>';
-                return;
-            }
-
-            container.innerHTML = botState.trades.slice().reverse().slice(0, 20).map(trade => {
-                const isBuy = trade.side === 'BUY';
-                const profitStr = trade.profit !== undefined ? `<span class="${trade.profit >= 0 ? 'text-success' : 'text-danger'}">${trade.profit >= 0 ? '+' : ''}${trade.profit.toFixed(2)}</span>` : '';
-                return `
-                    <div class="trade-item">
-                        <div class="d-flex justify-content-between">
-                            <span class="${isBuy ? 'text-primary' : 'text-danger'}">${isBuy ? '🛒买入' : '💰卖出'}</span>
-                            <span>${trade.time}</span>
-                        </div>
-                        <div class="small">
-                            ${trade.symbol} | ${trade.amount.toFixed(4)} @ ${trade.price}
-                            ${profitStr ? `| ${profitStr} USDT` : ''}
-                        </div>
-                    </div>
-                `;
-            }).join('');
-        }
-
-        function updateStats() {
-            document.getElementById('stat-total-profit').textContent = botState.profit.toFixed(2);
-            document.getElementById('stat-roi').textContent = ((botState.profit / botState.config.initial_capital) * 100).toFixed(2) + '%';
-            document.getElementById('stat-trades').textContent = botState.trades.length;
-
-            let totalHoldings = 0;
-            for (const key in botState.totalBought) {
-                totalHoldings += botState.totalBought[key];
-            }
-            document.getElementById('stat-holdings').textContent = totalHoldings.toFixed(4);
-        }
-
-        // ========== 启动/停止 ==========
-        function startBot() {
-            if (!botState.address) {
-                toast('请先连接TP钱包', 'warning');
-                return;
-            }
-            botState.running = true;
-            document.getElementById('live-status').textContent = 'RUNNING';
-            log('量化机器人已启动', 'info');
-            toast('机器人已启动 🟢', 'success');
-        }
-
-        function stopBot() {
-            botState.running = false;
-            document.getElementById('live-status').textContent = 'STOPPED';
-            document.getElementById('live-indicator').querySelector('.live-dot').style.background = '#FF9800';
-            log('量化机器人已停止', 'warn');
-            toast('机器人已停止 🟡', 'warning');
-        }
-
-        // ========== 配置保存 ==========
-        function saveConfig() {
-            botState.config = {
-                initial_capital: parseFloat(document.getElementById('cfg-capital').value) || 1000,
-                per_trade_ratio: (parseFloat(document.getElementById('cfg-per-trade').value) || 10) / 100,
-                profit_rate: (parseFloat(document.getElementById('cfg-profit').value) || 2) / 100,
-                buy_drop_rate: (parseFloat(document.getElementById('cfg-drop').value) || 1.5) / 100,
-                stop_loss_rate: (parseFloat(document.getElementById('cfg-stop').value) || 5) / 100,
-                check_interval: parseInt(document.getElementById('cfg-interval').value) || 10
-            };
-            localStorage.setItem('tpQuantConfig', JSON.stringify(botState.config));
-            log('配置已保存', 'info');
-            toast('配置已保存 ✅', 'success');
-        }
-
-        function loadConfig() {
-            const saved = localStorage.getItem('tpQuantConfig');
-            if (saved) {
-                botState.config = JSON.parse(saved);
-                document.getElementById('cfg-capital').value = botState.config.initial_capital;
-                document.getElementById('cfg-per-trade').value = (botState.config.per_trade_ratio * 100).toFixed(0);
-                document.getElementById('cfg-profit').value = (botState.config.profit_rate * 100).toFixed(1);
-                document.getElementById('cfg-drop').value = (botState.config.buy_drop_rate * 100).toFixed(1);
-                document.getElementById('cfg-stop').value = (botState.config.stop_loss_rate * 100).toFixed(1);
-                document.getElementById('cfg-interval').value = botState.config.check_interval;
-            }
-        }
-
-        // ========== 日志 ==========
-        function log(message, level = 'info') {
-            const console = document.getElementById('log-console');
-            const time = new Date().toLocaleTimeString();
-            const entry = document.createElement('div');
-            entry.className = `log-entry log-${level}`;
-            entry.innerHTML = `<span class="log-time">[${time}]</span> ${message}`;
-            console.appendChild(entry);
-            console.scrollTop = console.scrollHeight;
-        }
-
-        function clearLog() {
-            document.getElementById('log-console').innerHTML = '';
-            log('日志已清除', 'info');
-        }
-
-        // ========== 工具函数 ==========
-        function formatAddress(addr) {
-            return addr ? `${addr.substring(0,6)}...${addr.substring(addr.length-4)}` : '';
-        }
-
-        function getNetworkName(chainId) {
-            const networks = {
-                '0x38': 'BSC',
-                '0x1': 'Ethereum',
-                '0x56': 'BSC',
-                '0x61': 'BSC Testnet',
-                '0x97': 'BSC Testnet'
-            };
-            return networks[chainId] || 'Unknown';
-        }
-
-        function toast(message, type = 'info') {
-            const colors = {
-                info: 'info',
-                success: 'success',
-                warning: 'warning',
-                error: 'danger'
-            };
-            const html = `<div class="toast toast-custom alert alert-${colors[type]} alert-dismissible fade show" role="alert">
-                ${message}
-                <button type="button" class="close" data-dismiss="alert">&times;</button>
-            </div>`;
-            document.body.insertAdjacentHTML('beforeend', html);
-            setTimeout(() => document.querySelector('.toast-custom')?.remove(), 3000);
-        }
-
-        // ========== 初始化 ==========
-        window.onload = function() {
-            loadConfig();
-            log('TP钱包量化机器人初始化完成', 'info');
-            log('请先连接TP钱包开始交易', 'info');
-        };
-    </script>
+// 每30秒自动保存
+setInterval(() => {
+    try {
+        localStorage.setItem('tpquant_v1', JSON.stringify({ state, cfg }));
+    } catch(e) {}
+}, 30000);
+</script>
 </body>
 </html>
