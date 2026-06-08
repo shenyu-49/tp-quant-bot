@@ -247,16 +247,16 @@
             <div class="form-group">
                 <div class="form-row">
                     <span>止盈比例</span>
-                    <span class="param-val" id="lbl-profit">2.0%</span>
+                    <span class="param-val" id="lbl-profit">5.0%</span>
                 </div>
-                <input type="range" id="sl-profit" min="0.5" max="10" step="0.5" value="2">
+                <input type="range" id="sl-profit" min="0.5" max="20" step="0.5" value="5">
             </div>
             <div class="form-group">
                 <div class="form-row">
                     <span>买入回调</span>
-                    <span class="param-val" id="lbl-drop">1.5%</span>
+                    <span class="param-val" id="lbl-drop">3.0%</span>
                 </div>
-                <input type="range" id="sl-drop" min="0.5" max="5" step="0.5" value="1.5">
+                <input type="range" id="sl-drop" min="1" max="15" step="0.5" value="3">
             </div>
             <div class="form-group">
                 <div class="form-row">
@@ -410,8 +410,8 @@
 const cfg = {
     capital: 1000,
     perTrade: 0.10,
-    profitRate: 0.02,
-    buyDropRate: 0.015,
+    profitRate: 0.05,
+    buyDropRate: 0.03,
     stopLossRate: 0.05,
     checkInterval: 5000,
 };
