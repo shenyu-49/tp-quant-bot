@@ -1,0 +1,664 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>TP量化机器人</title>
+    <style>
+        :root {
+            --bg: #0a0e1a;
+            --card: #111827;
+            --border: rgba(255,255,255,0.06);
+            --primary: #3b82f6;
+            --success: #10b981;
+            --danger: #ef4444;
+            --warning: #f59e0b;
+            --text: #f1f5f9;
+            --muted: #64748b;
+            --green: #22c55e;
+            --red: #f43f5e;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+        body {
+            background: var(--bg);
+            color: var(--text);
+            font-family: -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+            min-height: 100vh;
+            font-size: 14px;
+        }
+        .container { max-width: 500px; margin: 0 auto; padding: 12px; }
+        .card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            margin-bottom: 12px;
+            overflow: hidden;
+        }
+        .card-header {
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 13px;
+            font-weight: 600;
+        }
+        .card-body { padding: 16px; }
+        .price-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+        .price-item {
+            background: rgba(255,255,255,0.03);
+            border-radius: 12px;
+            padding: 12px 8px;
+            text-align: center;
+        }
+        .price-item .sym { font-size: 11px; color: var(--muted); margin-bottom: 4px; }
+        .price-item .val { font-size: 15px; font-weight: 700; }
+        .price-item .sig { font-size: 10px; margin-top: 4px; padding: 2px 6px; border-radius: 8px; display: inline-block; }
+        .sig-buy { background: rgba(59,130,246,0.15); color: #60a5fa; }
+        .sig-sell { background: rgba(239,68,68,0.15); color: #f87171; }
+        .sig-hold { background: rgba(255,255,255,0.06); color: var(--muted); }
+        .stat-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+        .stat-box {
+            background: rgba(255,255,255,0.03);
+            border-radius: 10px;
+            padding: 10px 4px;
+            text-align: center;
+        }
+        .stat-box .v { font-size: 14px; font-weight: 700; color: #fff; }
+        .stat-box .l { font-size: 10px; color: var(--muted); margin-top: 2px; }
+        .profit-pos { color: var(--green); }
+        .profit-neg { color: var(--red); }
+        .form-group { margin-bottom: 10px; }
+        .form-group label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+        .form-row { display: flex; gap: 8px; align-items: center; justify-content: space-between; }
+        .form-row span { font-size: 12px; }
+        input[type="range"] {
+            -webkit-appearance: none;
+            width: 100%;
+            height: 4px;
+            border-radius: 2px;
+            background: rgba(255,255,255,0.1);
+            outline: none;
+        }
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 18px; height: 18px;
+            border-radius: 50%;
+            background: var(--primary);
+            cursor: pointer;
+        }
+        .btn-row { display: flex; gap: 8px; }
+        .btn {
+            flex: 1;
+            padding: 12px;
+            border: none;
+            border-radius: 12px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .btn-primary { background: var(--primary); color: white; }
+        .btn-success { background: var(--success); color: white; }
+        .btn-danger { background: var(--danger); color: white; }
+        .btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text); }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .trade-list { max-height: 200px; overflow-y: auto; }
+        .trade-item {
+            padding: 8px 0;
+            border-bottom: 1px solid var(--border);
+            font-size: 12px;
+        }
+        .trade-item:last-child { border-bottom: none; }
+        .trade-item .top { display: flex; justify-content: space-between; margin-bottom: 2px; }
+        .wallet-banner {
+            background: linear-gradient(135deg, #1e3a5f, #0f2744);
+            border: 1px solid rgba(59,130,246,0.3);
+            border-radius: 12px;
+            padding: 16px;
+            text-align: center;
+            margin-bottom: 12px;
+        }
+        .wallet-banner.connected { background: linear-gradient(135deg, #064e3b, #022c22); border-color: rgba(16,185,129,0.3); }
+        .wallet-banner .addr { font-size: 13px; color: #93c5fd; font-family: monospace; }
+        .wallet-banner.connected .addr { color: #6ee7b7; }
+        .log-box {
+            background: #050810;
+            border-radius: 8px;
+            padding: 8px;
+            font-family: 'Courier New', monospace;
+            font-size: 11px;
+            max-height: 150px;
+            overflow-y: auto;
+            line-height: 1.6;
+        }
+        .log-line { margin: 1px 0; }
+        .log-ts { color: #334155; margin-right: 4px; }
+        .log-i { color: #10b981; }
+        .log-w { color: #f59e0b; }
+        .log-e { color: #ef4444; }
+        .live-badge {
+            display: inline-flex; align-items: center; gap: 4px;
+            font-size: 11px; color: var(--muted);
+        }
+        .live-dot {
+            width: 6px; height: 6px; border-radius: 50%;
+            background: var(--success);
+        }
+        .live-dot.running { animation: pulse 1.5s infinite; }
+        @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+        .empty { text-align: center; color: var(--muted); padding: 24px; font-size: 13px; }
+        .param-val { color: #60a5fa; font-weight: 600; }
+        .signal-panel {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            font-size: 12px;
+        }
+        .signal-item {
+            background: rgba(255,255,255,0.03);
+            border-radius: 8px;
+            padding: 8px 10px;
+            display: flex;
+            justify-content: space-between;
+        }
+        .signal-item .k { color: var(--muted); }
+        .signal-item .v { font-weight: 600; }
+    </style>
+</head>
+<body>
+<div class="container">
+
+    <!-- 钱包连接 -->
+    <div id="wallet-banner" class="wallet-banner">
+        <div style="font-size:13px;color:#93c5fd;margin-bottom:8px;">🔗 TP钱包未连接</div>
+        <div style="font-size:11px;color:#475569;">连接后可开始自动量化交易</div>
+        <button class="btn btn-primary" style="margin-top:12px;width:100%;" onclick="connectWallet()">连接TP钱包</button>
+    </div>
+
+    <!-- 实时价格 -->
+    <div class="card">
+        <div class="card-header">
+            <span>实时行情</span>
+            <span id="price-time" class="live-badge"><span class="live-dot"></span>--:--:--</span>
+        </div>
+        <div class="card-body">
+            <div class="price-grid">
+                <div class="price-item">
+                    <div class="sym">BTC</div>
+                    <div class="val" id="p-btc">--</div>
+                    <div class="sig sig-hold" id="s-btc">--</div>
+                </div>
+                <div class="price-item">
+                    <div class="sym">ETH</div>
+                    <div class="val" id="p-eth">--</div>
+                    <div class="sig sig-hold" id="s-eth">--</div>
+                </div>
+                <div class="price-item">
+                    <div class="sym">BNB</div>
+                    <div class="val" id="p-bnb">--</div>
+                    <div class="sig sig-hold" id="s-bnb">--</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 账户状态 -->
+    <div class="card">
+        <div class="card-header">
+            <span>账户状态</span>
+            <span class="live-badge"><span class="live-dot" id="bot-dot"></span><span id="bot-status-text">已停止</span></span>
+        </div>
+        <div class="card-body">
+            <div class="stat-row">
+                <div class="stat-box">
+                    <div class="v" id="st-profit">0.00</div>
+                    <div class="l">累计收益</div>
+                </div>
+                <div class="stat-box">
+                    <div class="v" id="st-roi">0.0%</div>
+                    <div class="l">收益率</div>
+                </div>
+                <div class="stat-box">
+                    <div class="v" id="st-trades">0</div>
+                    <div class="l">交易数</div>
+                </div>
+                <div class="stat-box">
+                    <div class="v" id="st-hold">0</div>
+                    <div class="l">持仓</div>
+                </div>
+            </div>
+            <!-- 信号面板 -->
+            <div class="signal-panel" style="margin-top:12px;">
+                <div class="signal-item"><span class="k">买入阈值</span><span class="v" id="sig-buy">--</span></div>
+                <div class="signal-item"><span class="k">卖出阈值</span><span class="v" id="sig-sell">--</span></div>
+                <div class="signal-item"><span class="k">止损阈值</span><span class="v" id="sig-stop">--</span></div>
+                <div class="signal-item"><span class="k">上次买入</span><span class="v" id="sig-last">--</span></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 参数配置 -->
+    <div class="card">
+        <div class="card-header"><span>策略参数</span><span style="color:var(--muted);font-weight:400;font-size:11px;">实时生效</span></div>
+        <div class="card-body">
+            <div class="form-group">
+                <div class="form-row">
+                    <span>初始资金 (USDT)</span>
+                    <span class="param-val" id="lbl-capital">1000</span>
+                </div>
+                <input type="range" id="sl-capital" min="100" max="10000" step="100" value="1000">
+            </div>
+            <div class="form-group">
+                <div class="form-row">
+                    <span>每笔比例</span>
+                    <span class="param-val" id="lbl-per">10%</span>
+                </div>
+                <input type="range" id="sl-per" min="5" max="50" step="5" value="10">
+            </div>
+            <div class="form-group">
+                <div class="form-row">
+                    <span>止盈比例</span>
+                    <span class="param-val" id="lbl-profit">2.0%</span>
+                </div>
+                <input type="range" id="sl-profit" min="0.5" max="10" step="0.5" value="2">
+            </div>
+            <div class="form-group">
+                <div class="form-row">
+                    <span>买入回调</span>
+                    <span class="param-val" id="lbl-drop">1.5%</span>
+                </div>
+                <input type="range" id="sl-drop" min="0.5" max="5" step="0.5" value="1.5">
+            </div>
+            <div class="form-group">
+                <div class="form-row">
+                    <span>止损比例</span>
+                    <span class="param-val" id="lbl-stop">5.0%</span>
+                </div>
+                <input type="range" id="sl-stop" min="1" max="20" step="1" value="5">
+            </div>
+        </div>
+    </div>
+
+    <!-- 控制 -->
+    <div class="card-body" style="padding:0 0 4px;">
+        <div class="btn-row">
+            <button class="btn btn-success" id="btn-start" onclick="startBot()">▶ 启动机器人</button>
+            <button class="btn btn-danger" id="btn-stop" onclick="stopBot()" disabled>■ 停止</button>
+        </div>
+    </div>
+
+    <!-- 交易历史 -->
+    <div class="card">
+        <div class="card-header">
+            <span>交易历史</span>
+            <span id="trade-count" style="font-size:11px;color:var(--muted);">0笔</span>
+        </div>
+        <div class="card-body">
+            <div class="trade-list" id="trade-list">
+                <div class="empty">暂无交易记录</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 运行日志 -->
+    <div class="card">
+        <div class="card-header">
+            <span>运行日志</span>
+            <button style="background:none;border:none;color:var(--muted);font-size:11px;cursor:pointer;" onclick="clearLog()">清除</button>
+        </div>
+        <div class="card-body">
+            <div class="log-box" id="log-box"></div>
+        </div>
+    </div>
+
+</div>
+
+<script>
+// ====================== 核心引擎 ======================
+const cfg = {
+    capital: 1000,
+    perTrade: 0.10,
+    profitRate: 0.02,
+    buyDropRate: 0.015,
+    stopLossRate: 0.05,
+    checkInterval: 5000,
+};
+
+const state = {
+    running: false,
+    address: '',
+    chainId: '',
+    profit: 0,
+    trades: [],
+    prices: { BTC: 0, ETH: 0, BNB: 0 },
+    lastBuy: { BTC: 0, ETH: 0, BNB: 0 },
+    totalBought: { BTC: 0, ETH: 0, BNB: 0 },
+    totalSold: { BTC: 0, ETH: 0, BNB: 0 },
+    firstBuyDone: { BTC: false, ETH: false, BNB: false },
+};
+
+let priceTimer = null;
+let botTimer = null;
+
+// ====================== TP钱包 ======================
+function getTPProvider() {
+    if (window.dapp) return window.dapp;
+    if (window.ethereum?.isTokenPocket) return window.ethereum;
+    if (window.tp) return window.tp;
+    return null;
+}
+
+async function connectWallet() {
+    const provider = getTPProvider();
+    if (!provider) {
+        log('请安装TP钱包', 'e');
+        alert('请先安装 TP钱包\n\n在TP钱包内打开此页面，或使用内置浏览器');
+        return;
+    }
+    try {
+        const accounts = await provider.request({ method: 'eth_requestAccounts' });
+        if (!accounts?.length) throw new Error('无账户');
+        state.address = accounts[0];
+        state.chainId = await provider.request({ method: 'eth_chainId' }).catch(() => '0x38');
+        showWalletConnected();
+        log('TP钱包已连接: ' + addr(state.address), 'i');
+    } catch (e) {
+        log('连接失败: ' + e.message, 'e');
+    }
+}
+
+function showWalletConnected() {
+    const banner = document.getElementById('wallet-banner');
+    banner.className = 'wallet-banner connected';
+    banner.innerHTML = `
+        <div style="font-size:12px;color:#6ee7b7;margin-bottom:4px;">✓ 已连接</div>
+        <div class="addr">${addr(state.address)}</div>
+        <div style="font-size:11px;color:#475569;margin-top:4px;">链: ${chainName(state.chainId)}</div>
+    `;
+}
+
+function addr(a) { return a ? a.slice(0,6)+'...'+a.slice(-4) : ''; }
+function chainName(id) {
+    const m = { '0x38':'BSC','0x1':'ETH','0x56':'BSC','0x61':'Testnet' };
+    return m[id] || 'BSC';
+}
+
+// ====================== 价格 ======================
+async function fetchPrice(sym, pair) {
+    try {
+        const r = await fetch(`https://api.binance.com/api/v3/ticker/price?symbol=${pair}`);
+        const d = await r.json();
+        return parseFloat(d.price);
+    } catch { return 0; }
+}
+
+async function updatePrices() {
+    const syms = [['BTC','BTCUSDT'],['ETH','ETHUSDT'],['BNB','BNBUSDT']];
+    let updated = false;
+    for (const [k, p] of syms) {
+        const price = await fetchPrice(k, p);
+        if (price > 0) {
+            state.prices[k] = price;
+            document.getElementById('p-'+k.toLowerCase()).textContent = fmt(price, k);
+            updated = true;
+        }
+    }
+    if (updated) {
+        document.getElementById('price-time').innerHTML = `<span class="live-dot"></span>${new Date().toLocaleTimeString()}`;
+    }
+}
+
+function fmt(price, sym) {
+    if (sym === 'BNB' && price < 10) return price.toFixed(4);
+    if (price >= 10000) return price.toLocaleString('en', {maximumFractionDigits:0});
+    if (price >= 100) return price.toFixed(2);
+    return price.toFixed(4);
+}
+
+// ====================== 策略引擎 ======================
+function checkSignal(sym) {
+    const price = state.prices[sym];
+    if (!price) return null;
+    const last = state.lastBuy[sym];
+    const hold = state.totalBought[sym];
+
+    if (!state.firstBuyDone[sym]) {
+        return { type: 'first_buy', text: '🛒 可买入', cls: 'sig-buy' };
+    }
+    if (hold > 0) {
+        const take = last * (1 + cfg.profitRate);
+        const stop = last * (1 - cfg.stopLossRate);
+        const drop = last * (1 - cfg.buyDropRate);
+        if (price >= take) return { type: 'sell_tp', text: '🎯 止盈', cls: 'sig-sell', take, stop, drop };
+        if (price <= stop) return { type: 'sell_sl', text: '⚠️ 止损', cls: 'sig-sell', take, stop, drop };
+        if (price <= drop) return { type: 'buy_cb', text: '📉 回调买', cls: 'sig-buy', take, stop, drop };
+        return { type: 'hold', text: '📊 持', cls: 'sig-hold', take, stop, drop };
+    } else {
+        const drop = last * (1 - cfg.buyDropRate);
+        return { type: 'wait', text: last > 0 && price <= drop ? '🛒 买入' : '📊 等待', cls: last > 0 && price <= drop ? 'sig-buy' : 'sig-hold', take: last*(1+cfg.profitRate), stop: last*(1-cfg.stopLossRate), drop };
+    }
+}
+
+function runBotCycle() {
+    const syms = ['BTC','ETH','BNB'];
+    for (const sym of syms) {
+        const sig = checkSignal(sym);
+        if (!sig) continue;
+
+        // 更新信号显示
+        const el = document.getElementById('s-'+sym.toLowerCase());
+        el.textContent = sig.text;
+        el.className = 'sig '+sig.cls;
+
+        if (!state.running) continue;
+        if (!state.address) continue;
+
+        // 更新阈值
+        if (sig.drop) document.getElementById('sig-buy').textContent = fmt(sig.drop, sym);
+        if (sig.take) document.getElementById('sig-sell').textContent = fmt(sig.take, sym);
+        if (sig.stop) document.getElementById('sig-stop').textContent = fmt(sig.stop, sym);
+        document.getElementById('sig-last').textContent = state.lastBuy[sym] ? fmt(state.lastBuy[sym], sym) : '--';
+
+        // 执行交易
+        if (sig.type === 'first_buy' || sig.type === 'buy_cb') {
+            execBuy(sym, sig);
+        } else if (sig.type === 'sell_tp' || sig.type === 'sell_sl') {
+            execSell(sym, sig);
+        }
+    }
+    updateStats();
+}
+
+function execBuy(sym, sig) {
+    const price = state.prices[sym];
+    if (!price) return;
+    const amount = (cfg.capital + state.profit) * cfg.perTrade / price;
+    const fee = amount * price * 0.001;
+
+    const trade = {
+        id: Date.now(),
+        time: new Date().toLocaleTimeString(),
+        sym,
+        side: 'BUY',
+        price,
+        amount,
+        fee,
+        note: sig.type === 'first_buy' ? '首买入' : '回调买入'
+    };
+    state.trades.push(trade);
+    state.lastBuy[sym] = price;
+    state.totalBought[sym] += amount;
+    state.firstBuyDone[sym] = true;
+
+    log(`🛒 买入 ${sym}: ${amount.toFixed(6)} @ ${fmt(price,sym)} (${trade.note})`, 'i');
+    renderTrades();
+}
+
+function execSell(sym, sig) {
+    const price = state.prices[sym];
+    const amount = state.totalBought[sym];
+    if (!price || amount <= 0) return;
+    const value = amount * price;
+    const cost = amount * state.lastBuy[sym];
+    const fee = value * 0.001;
+    const profit = value - cost - fee;
+
+    const trade = {
+        id: Date.now(),
+        time: new Date().toLocaleTimeString(),
+        sym,
+        side: 'SELL',
+        price,
+        amount,
+        fee,
+        profit,
+        note: sig.type === 'sell_tp' ? '止盈' : '止损'
+    };
+    state.trades.push(trade);
+    state.profit += profit;
+    state.totalSold[sym] += amount;
+    state.totalBought[sym] = 0;
+    state.lastBuy[sym] = 0;
+    state.firstBuyDone[sym] = false;
+
+    const cls = profit >= 0 ? 'i' : 'e';
+    log(`💰 卖出 ${sym}: ${amount.toFixed(6)} @ ${fmt(price,sym)} | ${profit>=0?'+':''}${profit.toFixed(2)} USDT (${trade.note})`, cls);
+    renderTrades();
+}
+
+// ====================== UI ======================
+function updateStats() {
+    const profitEl = document.getElementById('st-profit');
+    profitEl.textContent = (state.profit >= 0 ? '+' : '') + state.profit.toFixed(2);
+    profitEl.className = 'v ' + (state.profit >= 0 ? 'profit-pos' : 'profit-neg');
+    document.getElementById('st-roi').textContent = (state.profit / cfg.capital * 100).toFixed(2) + '%';
+    document.getElementById('st-trades').textContent = state.trades.length;
+    let totalHold = 0;
+    for (const k in state.totalBought) totalHold += state.totalBought[k];
+    document.getElementById('st-hold').textContent = totalHold > 0 ? totalHold.toFixed(4) : '0';
+}
+
+function renderTrades() {
+    const list = document.getElementById('trade-list');
+    document.getElementById('trade-count').textContent = state.trades.length + '笔';
+    if (!state.trades.length) {
+        list.innerHTML = '<div class="empty">暂无交易记录</div>';
+        return;
+    }
+    list.innerHTML = state.trades.slice().reverse().slice(0,30).map(t => {
+        const pStr = t.side === 'SELL'
+            ? `<span style="color:${t.profit>=0?'#22c55e':'#f43f5e'}">${t.profit>=0?'+':''}${t.profit?.toFixed(2)} USDT</span>`
+            : `<span style="color:#64748b">手续费: ${(t.fee||0).toFixed(4)}</span>`;
+        return `<div class="trade-item">
+            <div class="top">
+                <span style="color:${t.side==='BUY'?'#60a5fa':'#f87171'};font-weight:600">${t.side==='BUY'?'🛒买入':'💰卖出'}</span>
+                <span style="color:#475569">${t.time}</span>
+            </div>
+            <div style="color:#94a3b8">${t.sym} · ${t.amount.toFixed(6)} @ ${fmt(t.price,t.sym)}</div>
+            <div>${pStr} <span style="color:#475569">· ${t.note}</span></div>
+        </div>`;
+    }).join('');
+}
+
+function startBot() {
+    if (!state.address) {
+        log('请先连接TP钱包', 'w');
+        return;
+    }
+    state.running = true;
+    document.getElementById('bot-status-text').textContent = '运行中';
+    document.getElementById('bot-dot').className = 'live-dot running';
+    document.getElementById('btn-start').disabled = true;
+    document.getElementById('btn-stop').disabled = false;
+    log('🤖 机器人已启动', 'i');
+    priceTimer = setInterval(updatePrices, 4000);
+    botTimer = setInterval(runBotCycle, cfg.checkInterval);
+    updatePrices();
+}
+
+function stopBot() {
+    state.running = false;
+    clearInterval(priceTimer);
+    clearInterval(botTimer);
+    document.getElementById('bot-status-text').textContent = '已停止';
+    document.getElementById('bot-dot').className = 'live-dot';
+    document.getElementById('btn-start').disabled = false;
+    document.getElementById('btn-stop').disabled = true;
+    log('⏹ 机器人已停止', 'w');
+}
+
+// ====================== 参数滑动 ======================
+function bindSlider(id, lblId, fmt, setter) {
+    const el = document.getElementById(id);
+    const lbl = document.getElementById(lblId);
+    el.addEventListener('input', () => {
+        const v = parseFloat(el.value);
+        lbl.textContent = fmt(v);
+        setter(v);
+    });
+}
+
+bindSlider('sl-capital', 'lbl-capital', v => v, v => cfg.capital = v);
+bindSlider('sl-per', 'lbl-per', v => v+'%', v => cfg.perTrade = v/100);
+bindSlider('sl-profit', 'lbl-profit', v => v+'%', v => cfg.profitRate = v/100);
+bindSlider('sl-drop', 'lbl-drop', v => v+'%', v => cfg.buyDropRate = v/100);
+bindSlider('sl-stop', 'lbl-stop', v => v+'%', v => cfg.stopLossRate = v/100);
+
+// ====================== 日志 ======================
+function log(msg, level='i') {
+    const box = document.getElementById('log-box');
+    const ts = new Date().toLocaleTimeString();
+    const cls = { i:'log-i', w:'log-w', e:'log-e' }[level] || 'log-i';
+    const line = document.createElement('div');
+    line.className = 'log-line';
+    line.innerHTML = `<span class="log-ts">${ts}</span><span class="${cls}">${msg}</span>`;
+    box.appendChild(line);
+    box.scrollTop = box.scrollHeight;
+    if (box.children.length > 200) box.removeChild(box.firstChild);
+}
+
+function clearLog() {
+    document.getElementById('log-box').innerHTML = '';
+    log('日志已清除', 'i');
+}
+
+// ====================== 初始化 ======================
+log('📱 TP量化机器人初始化完成', 'i');
+log('⚠️ 请连接TP钱包后启动机器人', 'w');
+// 预加载一次价格
+updatePrices();
+setInterval(updatePrices, 15000);
+
+// 保存/恢复状态
+try {
+    const saved = localStorage.getItem('tpquant_v1');
+    if (saved) {
+        const d = JSON.parse(saved);
+        Object.assign(state, d.state);
+        Object.assign(cfg, d.cfg);
+        document.getElementById('sl-capital').value = cfg.capital;
+        document.getElementById('lbl-capital').textContent = cfg.capital;
+        document.getElementById('sl-per').value = cfg.perTrade * 100;
+        document.getElementById('lbl-per').textContent = (cfg.perTrade*100)+'%';
+        document.getElementById('sl-profit').value = cfg.profitRate * 100;
+        document.getElementById('lbl-profit').textContent = (cfg.profitRate*100)+'%';
+        document.getElementById('sl-drop').value = cfg.buyDropRate * 100;
+        document.getElementById('lbl-drop').textContent = (cfg.buyDropRate*100)+'%';
+        document.getElementById('sl-stop').value = cfg.stopLossRate * 100;
+        document.getElementById('lbl-stop').textContent = (cfg.stopLossRate*100)+'%';
+        renderTrades();
+        updateStats();
+        log('📂 已恢复上次的策略状态', 'i');
+    }
+} catch(e) {}
+
+// 每30秒自动保存
+setInterval(() => {
+    try {
+        localStorage.setItem('tpquant_v1', JSON.stringify({ state, cfg }));
+    } catch(e) {}
+}, 30000);
+</script>
+</body>
+</html>
