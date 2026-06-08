@@ -526,13 +526,26 @@ async function fetchPricesFromCache() {
 
 // 备用：从内置参考价读取（完全离线模式）
 const FALLBACK_PRICES = {
-    'BTC':63800,'ETH':3450,'BNB':585,'CAKE':2.45,'DOGE':0.158,
-    'SHIB':0.0000182,'PEPE':0.00000912,'SOL':148,'DOT':7.85,'XRP':0.528,
-    'ADA':0.485,'AVAX':38.5,'LINK':18.2,'MATIC':0.785,'AAVE':92.5,
-    'LTC':82.5,'FIL':5.85,'ARB':1.12,'OP':2.35,'INJ':26.8,
-    'NEAR':7.15,'FTM':0.78,'SUI':1.45,'XLM':0.108,'ATOM':8.5,
-    'UNI':9.8,'MKR':2850,'ALGO':0.178,'TRX':0.108,'BOME':0.0089,
-    'SLERF':0.78,'NOT':0.0058,'REZ':0.052,'PONKE':0.48,
+    'BTC': 63490.1591,
+    'ETH': 1684.8206,
+    'BNB': 607.2945,
+    'CAKE': 1.3175,
+    'DOGE': 0.086676,
+    'SHIB': 4.76e-06,
+    'PEPE': 2.83e-06,
+    'SOL': 67.2408,
+    'DOT': 0.985447,
+    'XRP': 1.1706,
+    'ADA': 0.169493,
+    'AVAX': 6.8184,
+    'LINK': 8.0326,
+    'MATIC': 0.111743,
+    'AAVE': 64.4125,
+    'LTC': 43.3185,
+    'FIL': 0.784468,
+    'ARB': 0.083477,
+    'OP': 0.097999,
+    'INJ': 5.7132,
 };
 
 async function fetchPrice(sym, pair) {
