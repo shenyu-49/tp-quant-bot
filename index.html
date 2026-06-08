@@ -1068,45 +1068,62 @@ KNOWN_TOKENS.forEach(t => {
 
 // ====================== 搜索函数（纯本地，无网络） ======================
 function searchContract() {
-    const addr = document.getElementById('search-contract').value.trim();
-    if (!addr) { showError('请输入合约地址'); return; }
-    if (!/^0x[0-9a-fA-F]{40}$/.test(addr)) { showError('无效的合约地址格式'); return; }
+    var addr = document.getElementById('search-contract').value.trim();
+    var loading = document.getElementById('token-loading');
+    var result = document.getElementById('token-result');
+    var error = document.getElementById('token-error');
     
-    showLoading(true);
+    // 显示加载状态
+    if (loading) { loading.style.display = 'block'; loading.textContent = '🔍 本地查询...'; }
+    if (result) result.style.display = 'none';
+    if (error) error.style.display = 'none';
     
-    // 步骤1: 用内置数据库精确匹配合约地址
-    const addrLower = addr.toLowerCase();
+    // 验证格式
+    if (!addr) {
+        if (loading) loading.style.display = 'none';
+        if (error) { error.textContent = '❌ 请输入合约地址'; error.style.display = 'block'; }
+        return;
+    }
+    if (!/^0x[0-9a-fA-F]{40}$/.test(addr)) {
+        if (loading) loading.style.display = 'none';
+        if (error) { error.textContent = '❌ 地址格式错误，需40位十六进制'; error.style.display = 'block'; }
+        return;
+    }
+    
+    var addrLower = addr.toLowerCase();
+    var token = null;
+    
+    // 精确匹配内置数据库
     if (TOKEN_ADDR_MAP[addrLower]) {
-        const t = TOKEN_ADDR_MAP[addrLower];
-        setTimeout(() => {
-            showTokenResult({ symbol: t.symbol, name: t.name, address: addr, pair: t.pair, found: true, fromList: true });
-            showLoading(false);
-        }, 300);
-        return;
+        token = TOKEN_ADDR_MAP[addrLower];
+    } else if (addrLower === '0xbb4cdb9cbd36b01bd1cbaebf2de08d9173bc095c') {
+        token = { symbol: 'WBNB', name: 'Wrapped BNB', pair: 'BNBUSDT', found: true };
+    } else if (addrLower === '0x55d398326f99059ff775485246999027b3197955') {
+        token = { symbol: 'USDT', name: 'Tether USD (BEP20)', pair: 'USDTBSC', found: true };
+    } else if (addrLower === '0x8ac76a51cc950d9822d68b83fe1ad97b32cd580d') {
+        token = { symbol: 'USDC', name: 'USD Coin (BEP20)', pair: 'USDCBSC', found: true };
     }
     
-    // 步骤2: 如果是 WBNB / BNB 地址
-    if (addrLower === '0xbb4cdb9cbd36b01bd1cbaebf2de08d9173bc095c') {
-        setTimeout(() => {
-            showTokenResult({ symbol: 'WBNB', name: 'Wrapped BNB', address: addr, pair: 'BNBUSDT', found: true, fromList: true });
-            showLoading(false);
-        }, 300);
-        return;
-    }
+    if (loading) loading.style.display = 'none';
     
-    // 步骤3: 合约地址精确匹配失败 → 允许用户手动添加
-    setTimeout(() => {
-        // 从地址提取一个假名（只用于显示）
-        const raw = addr.slice(2, 10).toUpperCase();
-        showTokenResult({
-            symbol: raw,
-            name: '未知代币 (需验证)',
-            address: addr,
-            pair: raw + 'USDT',
-            found: false
-        });
-        showLoading(false);
-    }, 300);
+    if (token) {
+        // 已知代币：秒出结果
+        pendingToken = { symbol: token.symbol, name: token.name, address: addr, pair: token.pair, found: true, fromList: true };
+        document.getElementById('result-symbol').textContent = token.symbol;
+        document.getElementById('result-name').textContent = token.name || '';
+        document.getElementById('result-addr').textContent = addr;
+        document.getElementById('result-pool').innerHTML = '<span style="color:#10b981;">✓ 内置数据库已验证</span>';
+        document.getElementById('token-result').style.display = 'block';
+    } else {
+        // 未知合约：允许手动添加
+        var raw = addr.slice(2, 10).toUpperCase();
+        pendingToken = { symbol: raw, name: '未验证代币', address: addr, pair: raw + 'USDT', found: false };
+        document.getElementById('result-symbol').textContent = raw;
+        document.getElementById('result-name').textContent = '⚠️ 未验证合约';
+        document.getElementById('result-addr').textContent = addr;
+        document.getElementById('result-pool').innerHTML = '<span style="color:#f59e0b;">⚠️ 合约未收录，添加前请先在 <a href="https://bscscan.com" target="_blank" style="color:#60a5fa;">BscScan</a> 验证</span>';
+        document.getElementById('token-result').style.display = 'block';
+    }
 }
 
 async function searchSymbolResults() {
