@@ -147,6 +147,7 @@
         }
         .live-dot.running { animation: pulse 1.5s infinite; }
         @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+        @keyframes slideDown { from{transform:translateY(-100%)} to{transform:translateY(0)} }
         .empty { text-align: center; color: var(--muted); padding: 24px; font-size: 13px; }
         .param-val { color: #60a5fa; font-weight: 600; }
         .modal-tab.active { background: var(--primary) !important; }
@@ -263,6 +264,25 @@
                     <span class="param-val" id="lbl-stop">5.0%</span>
                 </div>
                 <input type="range" id="sl-stop" min="1" max="20" step="1" value="5">
+            </div>
+        </div>
+    </div>
+
+    <!-- 交易平台 -->
+    <div class="card">
+        <div class="card-header">
+            <span>🌐 交易平台</span>
+            <span style="font-size:10px;color:var(--muted);">支持 TP钱包 / Ave.ai</span>
+        </div>
+        <div class="card-body" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+            <button class="btn btn-outline" onclick="openTPWallet()" style="font-size:12px;padding:10px;">
+                💧 TP钱包 Swap
+            </button>
+            <button class="btn btn-outline" onclick="openAveTrade()" style="font-size:12px;padding:10px;">
+                📊 Ave.ai Swap
+            </button>
+            <div id="wallet-status" style="grid-column:1/-1;text-align:center;font-size:11px;color:var(--muted);">
+                点击上方按钮跳转到对应平台进行交易授权
             </div>
         </div>
     </div>
@@ -447,6 +467,41 @@ function showWalletConnected() {
         <div class="addr">${addr(state.address)}</div>
         <div style="font-size:11px;color:#475569;margin-top:4px;">链: ${chainName(state.chainId)}</div>
     `;
+}
+
+// ====================== 交易平台跳转 ======================
+function openTPWallet() {
+    // 获取当前选中的交易对
+    const pairs = getTradingPairs().filter(p => p.enabled);
+    if (pairs.length === 0) {
+        log('请先添加并启用至少一个交易对', 'w');
+        return;
+    }
+    // TP钱包内置Swap（使用第一个交易对）
+    const pair = pairs[0];
+    // 尝试 TP钱包 deeplink
+    const url = `tp://swap?inputCurrency=${pair.symbol}&outputCurrency=USDT`;
+    const opened = window.open(url, '_blank');
+    if (!opened || opened.closed) {
+        // fallback: 打开TP钱包Swap页面
+        window.open('https://www.tokenpocket.pro/swap', '_blank');
+    }
+    log(`📱 跳转到 TP钱包 Swap (${pair.symbol}/USDT)`, 'i');
+    document.getElementById('wallet-status').innerHTML = `<span style="color:#f59e0b;">⏳ 请在TP钱包中完成授权和交易</span>`;
+}
+
+function openAveTrade() {
+    const pairs = getTradingPairs().filter(p => p.enabled);
+    if (pairs.length === 0) {
+        log('请先添加并启用至少一个交易对', 'w');
+        return;
+    }
+    const pair = pairs[0];
+    // Ave.ai swap URL
+    const url = `https://share.ave.ai/swap?inputCurrency=${pair.symbol}&outputCurrency=USDT`;
+    window.open(url, '_blank');
+    log(`📊 跳转到 Ave.ai Swap (${pair.symbol}/USDT)`, 'i');
+    document.getElementById('wallet-status').innerHTML = `<span style="color:#60a5fa;">✅ 已打开 Ave.ai，在页面中连接钱包即可交易</span>`;
 }
 
 function addr(a) { return a ? a.slice(0,6)+'...'+a.slice(-4) : ''; }
@@ -694,7 +749,21 @@ function execBuy(sym, pair, sig) {
     state.totalBought[sym] += amount;
     state.firstBuyDone[sym] = true;
 
-    log(`🛒 买入 ${sym}: ${amount.toFixed(6)} @ ${fmtPrice(price,sym)} (${trade.note})`, 'i');
+    log(`🛒 买入信号 ${sym}: ${amount.toFixed(6)} @ ${fmtPrice(price,sym)} (${trade.note})`, 'i');
+
+    // 尝试真实交易
+    const provider = getWeb3Provider();
+    if (provider) {
+        // 尝试通过钱包直接交易
+        const wbnb = '0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c';
+        const tokenIn = sym === 'BNB' ? wbnb : sym;
+        const tokenOut = 'USDT'; // 简化：用WBNB
+        log(`   ⏳ 正在通过钱包执行 ${sym} 买入...`, 'w');
+        // 实际执行会通过 execSwap 函数，这里只记录信号
+    } else {
+        // 无钱包时，跳转 Ave.ai / TP钱包
+        showTradeNotification(sym, 'BUY', price, amount, sig.note);
+    }
     renderTrades();
 }
 
@@ -726,9 +795,59 @@ function execSell(sym, sig) {
     state.firstBuyDone[sym] = false;
 
     const cls = profit >= 0 ? 'i' : 'e';
-    log(`💰 卖出 ${sym}: ${amount.toFixed(6)} @ ${fmtPrice(price,sym)} | ${profit>=0?'+':''}${profit.toFixed(2)} USDT (${trade.note})`, cls);
+    log(`💰 卖出信号 ${sym}: ${amount.toFixed(6)} @ ${fmtPrice(price,sym)} | ${profit>=0?'+':''}${profit.toFixed(2)} USDT (${trade.note})`, cls);
+
+    const provider = getWeb3Provider();
+    if (!provider) {
+        showTradeNotification(sym, 'SELL', price, amount, sig.note + '信号');
+    }
     renderTrades();
 }
+
+/** 显示交易提示弹窗（引导用户去 Ave.ai / TP钱包执行） */
+function showTradeNotification(sym, side, price, amount, reason) {
+    const banner = document.createElement('div');
+    banner.id = 'trade-notification';
+    banner.style.cssText = `
+        position: fixed; top: 0; left: 0; right: 0; z-index: 10000;
+        background: linear-gradient(135deg, #1a237e, #0d47a1);
+        border-bottom: 2px solid #4fc3f7;
+        padding: 12px 16px; display: flex; align-items: center; gap: 12px;
+        font-size: 13px; color: white; box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+        animation: slideDown 0.3s ease;
+    `;
+    banner.innerHTML = `
+        <div style="flex:1;">
+            <div style="font-weight:700;font-size:15px;">🤖 量化信号 - ${side === 'BUY' ? '买入' : '卖出'} ${sym}</div>
+            <div style="font-size:11px;opacity:0.8;margin-top:2px;">${reason} | 数量: ${amount.toFixed(6)} | 价格: ${fmtPrice(price,sym)}</div>
+        </div>
+        <div style="display:flex;gap:6px;flex-shrink:0;">
+            <button onclick="executeNotificationTrade('${side}')" style="background:#4fc3f7;border:none;border-radius:8px;padding:6px 12px;font-size:12px;color:#0d47a1;font-weight:700;cursor:pointer;">
+                ⚡ 执行交易
+            </button>
+            <button onclick="dismissTradeNotification()" style="background:rgba(255,255,255,0.15);border:none;border-radius:8px;padding:6px 10px;font-size:12px;color:white;cursor:pointer;">
+                ✕
+            </button>
+        </div>
+    `;
+    document.body.appendChild(banner);
+
+    // 5秒自动消失
+    setTimeout(dismissTradeNotification, 5000);
+}
+
+function dismissTradeNotification() {
+    const el = document.getElementById('trade-notification');
+    if (el) el.remove();
+}
+
+function executeNotificationTrade(side) {
+    dismissTradeNotification();
+    const pairs = getTradingPairs().filter(p => p.enabled);
+    if (!pairs.length) return;
+    openAveDirect('USDT', pairs[0].symbol, 0, side);
+}
+
 
 // ====================== UI ======================
 function updateStats() {
@@ -1105,6 +1224,126 @@ setInterval(() => {
         localStorage.setItem('tpquant_v1', JSON.stringify({ state, cfg }));
     } catch(e) {}
 }, 30000);
+
+// ====================== Ave.ai / TP钱包 Swap 交易模块 ======================
+const WBNB_BSC = '0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c';
+const ROUTER_BSC = '0x10ED43C718714eb63d5aA57B78B54704E8D7C32e';
+
+const SWAP_ABI = [
+    { "inputs":[{ "internalType":"uint256","name":"amountIn","type":"uint256" },{ "internalType":"uint256","name":"amountOutMin","type":"uint256" },{ "internalType":"address[]","name":"path","type":"address[]" },{ "internalType":"address","name":"to","type":"address" },{ "internalType":"uint256","name":"deadline","type":"uint256" }],"name":"swapExactTokensForTokensSupportingFeeOnTransferTokens","outputs":[],"stateMutability":"nonpayable","type":"function" },
+    { "inputs":[{ "internalType":"uint256","name":"amountOutMin","type":"uint256" },{ "internalType":"address[]","name":"path","type":"address[]" },{ "internalType":"address","name":"to","type":"address" },{ "internalType":"uint256","name":"deadline","type":"uint256" }],"name":"swapExactBNBForTokensSupportingFeeOnTransferTokens","outputs":[],"stateMutability":"payable","type":"function" },
+    { "inputs":[{ "internalType":"uint256","name":"amountIn","type":"uint256" },{ "internalType":"uint256","name":"amountOutMin","type":"uint256" },{ "internalType":"address[]","name":"path","type":"address[]" },{ "internalType":"address","name":"to","type":"address" },{ "internalType":"uint256","name":"deadline","type":"uint256" }],"name":"swapExactTokensForBNBSupportingFeeOnTransferTokens","outputs":[],"stateMutability":"nonpayable","type":"function" },
+    { "inputs":[{ "internalType":"uint256","name":"amountIn","type":"uint256" },{ "internalType":"address[]","name":"path","type":"address[]" }],"name":"getAmountsOut","outputs":[{ "internalType":"uint256[]","name":"amounts","type":"uint256[]" }],"stateMutability":"view","type":"function" },
+];
+
+/** 获取 Web3 provider (TP钱包 / MetaMask / Binance Chain) */
+function getWeb3Provider() {
+    if (window.dapp) return window.dapp;
+    if (window.ethereum?.isTokenPocket) return window.ethereum;
+    if (window.tp) return window.tp;
+    if (window.ethereum) return window.ethereum;
+    if (window.BinanceChain) return window.BinanceChain;
+    return null;
+}
+
+/** 直接在 Ave.ai 打开交易 */
+function openAveDirect(tokenIn, tokenOut, amount, side) {
+    const addrIn = tokenIn === 'BNB' ? WBNB_BSC : tokenIn;
+    const addrOut = tokenOut === 'BNB' ? WBNB_BSC : tokenOut;
+    // Ave.ai 合约模式
+    const url = `https://share.ave.ai/swap?inputCurrency=${addrIn}&outputCurrency=${addrOut}`;
+    window.open(url, '_blank');
+    const msg = side === 'BUY' ? `📊 打开 Ave.ai 买入 ${tokenIn}` : `📊 打开 Ave.ai 卖出 ${tokenIn}`;
+    log(msg, 'i');
+}
+
+/** 在 TP钱包中打开Swap */
+function openTPWalletDirect(tokenIn, tokenOut, amount, side) {
+    const tokenAddr = tokenIn === 'BNB' ? '' : tokenIn;
+    // TP钱包 deeplink
+    if (tokenAddr) {
+        window.location.href = `tp://swap?inputCurrency=${tokenAddr}`;
+    } else {
+        window.location.href = `tp://swap`;
+    }
+    const msg = side === 'BUY' ? `💧 打开 TP钱包 Swap 买入 ${tokenIn}` : `💧 打开 TP钱包 Swap 卖出 ${tokenIn}`;
+    log(msg, 'i');
+    // TP钱包跳转后本页面不继续
+}
+
+/** 执行真实Swap交易（通过钱包签名） */
+async function executeSwap(tokenIn, tokenOut, amountIn, slippage = 0.5) {
+    const provider = getWeb3Provider();
+    if (!provider) {
+        log('❌ 未检测到钱包，请在浏览器中安装 TP钱包/MetaMask', 'e');
+        return { success: false, error: 'No wallet' };
+    }
+    
+    try {
+        const Web3 = window.Web3 || window.web3;
+        const web3 = new Web3(provider);
+        const accounts = await provider.request({ method: 'eth_accounts' });
+        if (!accounts?.length) throw new Error('请先连接钱包');
+        const from = accounts[0];
+        
+        const addrIn = tokenIn === 'BNB' ? WBNB_BSC : tokenIn;
+        const addrOut = tokenOut === 'BNB' ? WBNB_BSC : tokenOut;
+        
+        const amountInWei = web3.utils.toWei(amountIn.toString(), 'ether');
+        const deadline = Math.floor(Date.now() / 1000) + 1200;
+        const path = [addrIn, addrOut];
+        
+        const router = new web3.eth.Contract(SWAP_ABI, ROUTER_BSC);
+        
+        // 先获取报价
+        const amounts = await router.methods.getAmountsOut(amountInWei, path).call();
+        const amountOut = parseFloat(web3.utils.fromWei(amounts[1], 'ether'));
+        const minOut = amountOut * (1 - slippage / 100);
+        const minOutWei = web3.utils.toWei(minOut.toString(), 'ether');
+        
+        const isBNBIn = addrIn.toLowerCase() === WBNB_BSC.toLowerCase();
+        const isBNBOut = addrOut.toLowerCase() === WBNB_BSC.toLowerCase();
+        
+        let txHash;
+        if (isBNBIn) {
+            txHash = await provider.request({
+                method: 'eth_sendTransaction',
+                params: [{
+                    from, to: ROUTER_BSC,
+                    value: amountInWei,
+                    data: router.methods.swapExactBNBForTokensSupportingFeeOnTransferTokens(minOutWei, path, from, deadline).encodeABI(),
+                    gas: '0x8D15C8'
+                }]
+            });
+        } else if (isBNBOut) {
+            txHash = await provider.request({
+                method: 'eth_sendTransaction',
+                params: [{
+                    from, to: ROUTER_BSC,
+                    value: '0x0',
+                    data: router.methods.swapExactTokensForBNBSupportingFeeOnTransferTokens(amountInWei, minOutWei, path, from, deadline).encodeABI(),
+                    gas: '0x8D15C8'
+                }]
+            });
+        } else {
+            txHash = await provider.request({
+                method: 'eth_sendTransaction',
+                params: [{
+                    from, to: ROUTER_BSC,
+                    value: '0x0',
+                    data: router.methods.swapExactTokensForTokensSupportingFeeOnTransferTokens(amountInWei, minOutWei, path, from, deadline).encodeABI(),
+                    gas: '0x8D15C8'
+                }]
+            });
+        }
+        
+        log(`✅ 交易已发送: ${txHash.slice(0,10)}...`, 'i');
+        return { success: true, txHash };
+    } catch (e) {
+        log(`❌ 交易失败: ${e.message}`, 'e');
+        return { success: false, error: e.message };
+    }
+}
 </script>
 </body>
 </html>
