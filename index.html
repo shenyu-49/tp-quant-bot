@@ -510,43 +510,68 @@ function chainName(id) {
     return m[id] || 'BSC';
 }
 
-// ====================== 价格 ======================
-function _fetch(url) {
-    return new Promise((resolve, reject) => {
-        const t = setTimeout(() => reject(new Error('timeout')), 6000);
-        fetch(url, { mode: 'cors' }).then(r => { clearTimeout(t); resolve(r); }).catch(e => { clearTimeout(t); reject(e); });
-    });
+// ====================== 价格（读 GitHub Pages 同源缓存，无 CORS 问题） ======================
+
+// GitHub Actions 每3分钟更新 prices.json，前端直接读同源文件
+async function fetchPricesFromCache() {
+    try {
+        const r = await fetch('./prices.json?t=' + Date.now(), { cache: 'no-store' });
+        if (r.ok) {
+            const d = await r.json();
+            if (d.prices) return d.prices;
+        }
+    } catch {}
+    return null;
 }
 
+// 备用：从内置参考价读取（完全离线模式）
+const FALLBACK_PRICES = {
+    'BTC':63800,'ETH':3450,'BNB':585,'CAKE':2.45,'DOGE':0.158,
+    'SHIB':0.0000182,'PEPE':0.00000912,'SOL':148,'DOT':7.85,'XRP':0.528,
+    'ADA':0.485,'AVAX':38.5,'LINK':18.2,'MATIC':0.785,'AAVE':92.5,
+    'LTC':82.5,'FIL':5.85,'ARB':1.12,'OP':2.35,'INJ':26.8,
+    'NEAR':7.15,'FTM':0.78,'SUI':1.45,'XLM':0.108,'ATOM':8.5,
+    'UNI':9.8,'MKR':2850,'ALGO':0.178,'TRX':0.108,'BOME':0.0089,
+    'SLERF':0.78,'NOT':0.0058,'REZ':0.052,'PONKE':0.48,
+};
+
 async function fetchPrice(sym, pair) {
-    const COINCAP_MAP = {
-        'BTC': 'bitcoin', 'ETH': 'ethereum', 'BNB': 'binance-coin',
-        'CAKE': 'pancakeswap-token', 'DOGE': 'dogecoin', 'SHIB': 'shiba-inu',
-        'PEPE': 'pepe', 'DOT': 'polkadot', 'SOL': 'solana', 'XRP': 'ripple',
-        'FIL': 'filecoin', 'LTC': 'litecoin', 'ADA': 'cardano', 'AVAX': 'avalanche-2',
-        'LINK': 'chainlink', 'MATIC': 'matic-network', 'AAVE': 'aave',
-    };
-    const id = COINCAP_MAP[sym] || sym.toLowerCase();
+    // 先尝试从缓存读取
+    const cache = await fetchPricesFromCache();
+    if (cache && cache[sym] && cache[sym] > 0) return cache[sym];
+    // 备选：内置参考价
+    return FALLBACK_PRICES[sym] || 0;
+}
 
-    // 方案1: CryptoCompare
-    try {
-        const r = await _fetch(`https://min-api.cryptocompare.com/data/price?fsym=${sym}&tsyms=USDT`);
-        if (r.ok) {
-            const d = await r.json();
-            if (d.USDT) return d.USDT;
+async function updatePrices() {
+    if (!state.running) return;
+    const pairs = getTradingPairs().filter(p => p.enabled);
+    const cache = await fetchPricesFromCache();
+
+    for (const p of pairs) {
+        const sym = p.symbol;
+        let price = 0;
+
+        // 优先从缓存读
+        if (cache && cache[sym] && cache[sym] > 0) {
+            price = cache[sym];
         }
-    } catch {}
 
-    // 方案2: CoinCap
-    try {
-        const r = await _fetch(`https://api.coincap.io/v2/assets/${id}`);
-        if (r.ok) {
-            const d = await r.json();
-            if (d.data && d.data.priceUsd) return parseFloat(d.data.priceUsd);
+        // 如果缓存没有，尝试外部API
+        if (!price) {
+            price = await fetchPrice(sym, p.pair);
         }
-    } catch {}
 
-    return 0;
+        // 如果都没有，用内置参考价
+        if (!price) {
+            price = FALLBACK_PRICES[sym] || 0;
+        }
+
+        if (price > 0) {
+            state.prices[sym] = price;
+            updatePriceDisplay(sym, price);
+        }
+    }
 }
 
 // ====================== 交易币种配置 ======================
