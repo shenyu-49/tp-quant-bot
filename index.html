@@ -331,7 +331,8 @@
         <!-- 合约搜索 -->
         <div id="panel-search" class="modal-panel">
             <input type="text" id="search-contract" placeholder="输入合约地址 0x..." 
-                style="width:100%;padding:10px 12px;border-radius:8px;border:1px solid var(--border);background:rgba(255,255,255,0.05);color:var(--text);font-size:13px;font-family:monospace;">
+                style="width:100%;padding:10px 12px;border-radius:8px;border:1px solid var(--border);background:rgba(255,255,255,0.05);color:var(--text);font-size:13px;font-family:monospace;"
+                onkeydown="if(event.key==='Enter')searchContract()">
             <button class="btn btn-primary" style="width:100%;margin-top:8px;" onclick="searchContract()">🔍 搜索代币</button>
         </div>
         
@@ -533,8 +534,9 @@ function renderEmptyPrices() {
     const pairs = getTradingPairs();
     for (const p of pairs) {
         const el = document.getElementById('p-'+p.symbol.toLowerCase());
-        if (el && !state.prices[p.symbol]) {
+        if (el) {
             el.textContent = '--';
+            el.className = 'val';
         }
         const sel = document.getElementById('s-'+p.symbol.toLowerCase());
         if (sel) {
@@ -855,23 +857,25 @@ async function searchContract() {
     
     showLoading(true);
     try {
-        // 尝试从Binance获取信息
-        const r = await fetch(`https://api.binance.com/api/v3/exchangeInfo`);
+        // 尝试从Binance获取symbol
+        const r = await fetch(`https://api.binance.com/api/v3/exchangeInfo`, { method: 'GET', mode: 'cors' });
         if (r.ok) {
             const data = await r.json();
-            // 尝试找symbol
-            const found = data.symbols?.find(s => s.symbol.endsWith(addr.slice(-6).toUpperCase()));
-            if (found) {
-                showTokenResult({ symbol: found.baseAsset, name: found.baseAsset, address: addr, pair: found.symbol });
-                return;
-            }
+            // 通过symbol格式猜测
+            const suffix = addr.slice(-8).replace(/0/g,'X').toUpperCase();
+            const pair = suffix + 'USDT';
+            showTokenResult({ symbol: suffix.replace(/X/g,'0'), name: '代币', address: addr, pair: pair });
+            showLoading(false);
+            return;
         }
-        // 如果API查不到，用简化模式（用户手动确认）
-        showTokenResult({ symbol: '代币', name: addr.slice(0,10)+'...', address: addr, pair: addr.slice(-8).toUpperCase()+'USDT' });
     } catch(e) {
-        // 无法访问Binance，直接显示输入地址
-        showTokenResult({ symbol: '新代币', name: '未知代币', address: addr, pair: addr.slice(-8).toUpperCase()+'USDT' });
+        // CORS被阻止时，走备选逻辑
     }
+    
+    // 备选：从地址尾字节生成symbol
+    const suffix = addr.slice(-6).toUpperCase();
+    const clean = suffix.replace(/[^A-Z0-9]/g, 'X');
+    showTokenResult({ symbol: clean || '代币', name: '未知代币', address: addr, pair: clean + 'USDT' });
     showLoading(false);
 }
 
@@ -916,14 +920,13 @@ function selectKnownToken(symbol) {
         return;
     }
     
-    // 添加到交易对
     added.push({ symbol: t.symbol, pair: t.pair, enabled: true });
     saveTradingPairs(added);
     renderTradingPairs();
     renderEmptyPrices();
     
     closeAddTokenModal();
-    log(`✅ 已添加交易对 ${t.symbol}`, 'i');
+    log(`✅ 已添加交易对 ${t.symbol} / USDT`, 'i');
 }
 
 function showTokenResult(token) {
@@ -984,15 +987,25 @@ function addCustomToken() {
 }
 
 function showLoading(show) {
-    document.getElementById('token-loading').style.display = show ? 'block' : 'none';
-    document.getElementById('token-result').style.display = 'none';
-    document.getElementById('token-error').style.display = 'none';
+    const loading = document.getElementById('token-loading');
+    const result = document.getElementById('token-result');
+    const error = document.getElementById('token-error');
+    if (show) {
+        if (loading) { loading.style.display = 'block'; loading.textContent = '🔄 查询中...'; }
+        if (result) result.style.display = 'none';
+        if (error) error.style.display = 'none';
+    } else {
+        if (loading) loading.style.display = 'none';
+    }
 }
 
 function showError(msg) {
-    document.getElementById('token-error').textContent = '❌ ' + msg;
-    document.getElementById('token-error').style.display = 'block';
-    document.getElementById('token-loading').style.display = 'none';
+    const loading = document.getElementById('token-loading');
+    const error = document.getElementById('token-error');
+    const result = document.getElementById('token-result');
+    if (loading) loading.style.display = 'none';
+    if (error) { error.textContent = '❌ ' + msg; error.style.display = 'block'; }
+    if (result) result.style.display = 'none';
 }
 
 // ====================== 初始化 ======================
@@ -1001,16 +1014,7 @@ log('⚠️ 请连接TP钱包后启动机器人', 'w');
 
 // 初始化渲染
 renderTradingPairs();
-renderEmptyPrices();
-updatePrices();
-setInterval(updatePrices, 15000);
-
-// ====================== 初始化 ======================
-log('📱 TP量化机器人初始化完成', 'i');
-log('⚠️ 请连接TP钱包后启动机器人', 'w');
-
-// 初始化渲染
-renderTradingPairs();
+renderPriceGrid();
 renderEmptyPrices();
 updatePrices();
 setInterval(updatePrices, 15000);
