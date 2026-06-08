@@ -457,33 +457,32 @@ function chainName(id) {
 
 // ====================== 价格 ======================
 async function fetchPrice(sym, pair) {
-    // CoinCap API - 支持浏览器跨域
+    // 多个API备选，确保至少一个能用
     const COINCAP_MAP = {
         'BTC': 'bitcoin', 'ETH': 'ethereum', 'BNB': 'binance-coin',
         'CAKE': 'pancakeswap-token', 'DOGE': 'dogecoin', 'SHIB': 'shiba-inu',
-        'PEPE': 'pepe', 'WBNB': 'wrapped-bitcoin', 'DOT': 'polkadot',
+        'PEPE': 'pepe', 'WBNB': 'binance-coin', 'DOT': 'polkadot',
         'SOL': 'solana', 'XRP': 'ripple', 'FIL': 'filecoin',
         'LTC': 'litecoin', 'ADA': 'cardano', 'AVAX': 'avalanche-2',
         'LINK': 'chainlink', 'MATIC': 'matic-network', 'AAVE': 'aave',
     };
-    
     const id = COINCAP_MAP[sym] || sym.toLowerCase();
+    
+    // 方案1: CryptoCompare (最可靠)
     try {
-        const r = await fetch(`https://api.coincap.io/v2/assets/${id}`, { mode: 'cors' });
+        const r = await fetch(`https://min-api.cryptocompare.com/data/price?fsym=${sym}&tsyms=USDT`, { mode: 'cors', signal: AbortSignal.timeout(5000) });
         if (r.ok) {
             const d = await r.json();
-            if (d.data && d.data.priceUsd) {
-                return parseFloat(d.data.priceUsd);
-            }
+            if (d.USDT) return d.USDT;
         }
     } catch {}
     
-    // 备选：Binance (可能失败)
+    // 方案2: CoinCap
     try {
-        const r = await fetch(`https://api.binance.com/api/v3/ticker/price?symbol=${pair}`, { mode: 'cors' });
+        const r = await fetch(`https://api.coincap.io/v2/assets/${id}`, { mode: 'cors', signal: AbortSignal.timeout(5000) });
         if (r.ok) {
             const d = await r.json();
-            return parseFloat(d.price);
+            if (d.data && d.data.priceUsd) return parseFloat(d.data.priceUsd);
         }
     } catch {}
     
@@ -883,49 +882,51 @@ async function searchContract() {
     
     showLoading(true);
     
-    // 先尝试 CoinGecko 合约查询 (BSC链)
+    // OKX 合约代币信息查询
     try {
-        const r = await fetch(`https://api.coingecko.com/api/v3/coins/binancecoin/contract/${addr}`, { mode: 'cors' });
+        const r = await fetch(`https://www.okx.com/api/v5/market/ticker?instId=${addr.slice(2,10).toUpperCase()}-USDT`, { mode: 'cors', signal: AbortSignal.timeout(5000) });
         if (r.ok) {
             const d = await r.json();
-            if (d.id) {
-                showTokenResult({ 
-                    symbol: d.symbol.toUpperCase(), 
-                    name: d.name, 
-                    address: addr, 
-                    pair: d.symbol.toUpperCase() + 'USDT' 
-                });
+            if (d.data && d.data[0]) {
+                const symbol = d.data[0].instId.replace('-USDT', '');
+                showTokenResult({ symbol, name: symbol, address: addr, pair: symbol + 'USDT' });
                 showLoading(false);
                 return;
             }
         }
     } catch {}
     
-    // 再试 Ethereum 链
+    // CoinGecko 备查
     try {
-        const r = await fetch(`https://api.coingecko.com/api/v3/coins/ethereum/contract/${addr}`, { mode: 'cors' });
+        const r = await fetch(`https://api.coingecko.com/api/v3/coins/binancecoin/contract/${addr}`, { mode: 'cors', signal: AbortSignal.timeout(5000) });
         if (r.ok) {
             const d = await r.json();
             if (d.id) {
-                showTokenResult({ 
-                    symbol: d.symbol.toUpperCase(), 
-                    name: d.name, 
-                    address: addr, 
-                    pair: d.symbol.toUpperCase() + 'USDT' 
-                });
+                showTokenResult({ symbol: d.symbol.toUpperCase(), name: d.name, address: addr, pair: d.symbol.toUpperCase() + 'USDT' });
+                showLoading(false);
+                return;
+            }
+        }
+    } catch {}
+    try {
+        const r = await fetch(`https://api.coingecko.com/api/v3/coins/ethereum/contract/${addr}`, { mode: 'cors', signal: AbortSignal.timeout(5000) });
+        if (r.ok) {
+            const d = await r.json();
+            if (d.id) {
+                showTokenResult({ symbol: d.symbol.toUpperCase(), name: d.name, address: addr, pair: d.symbol.toUpperCase() + 'USDT' });
                 showLoading(false);
                 return;
             }
         }
     } catch {}
     
-    // 查不到就走备选
-    const raw = addr.slice(2, 16).replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+    // 全部失败：允许用户手动确认添加
+    const raw = addr.slice(2, 14).replace(/[^a-zA-Z0-9]/g, '').toUpperCase().slice(0, 8);
     showTokenResult({ 
-        symbol: raw.slice(0, 8) || '自定义', 
+        symbol: raw || '自定义', 
         name: '自定义代币', 
         address: addr, 
-        pair: (raw.slice(0, 8) || 'TOKEN') + 'USDT' 
+        pair: (raw || 'TOKEN') + 'USDT' 
     });
     showLoading(false);
 }
